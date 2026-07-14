@@ -102,7 +102,8 @@ const UI = (() => {
     $('activity-grid').innerHTML = CONFIG.ACTIVITIES.map(a => `
       <button class="activity-choice ${a.id === selectedActivity ? 'selected' : ''}"
               data-activity="${a.id}" type="button">
-        <span class="emoji">${a.icon}</span>${a.name}
+        ${a.img ? `<img class="act-img" src="${a.img}" alt="">`
+                : `<span class="emoji">${a.icon}</span>`}${a.name}
       </button>`).join('');
     $('activity-grid').querySelectorAll('.activity-choice').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -116,6 +117,17 @@ const UI = (() => {
   function refreshGainPreview() {
     const p = State.current();
     const act = CONFIG.ACTIVITIES.find(a => a.id === selectedActivity);
+
+    // Bonus fixe (créatine) : pas de durée
+    $('duration-row').style.display = act.fixed ? 'none' : '';
+    if (act.fixed) {
+      const litres = Math.round(act.keroBonus * State.keroYield(p));
+      $('gain-preview').innerHTML =
+        `💊 La dose du jour : <b>+${fmt(litres)} L</b> de kérosène` +
+        (act.oncePerDay ? ' <small>(une prise par jour)</small>' : '') + '.';
+      return;
+    }
+
     const minutes = parseInt($('duration-slider').value, 10);
     $('duration-value').textContent = minutes;
     const litres = Math.round(act.keroPerMin * minutes * State.keroYield(p));
@@ -133,13 +145,25 @@ const UI = (() => {
     const res = Engine.logActivity(p, selectedActivity, minutes);
     closeModal('modal-activity');
     const act = CONFIG.ACTIVITIES.find(a => a.id === selectedActivity);
-    if (res.tookOff) {
-      toast(`🛫 REDÉCOLLAGE ! ${minutes} min de ${act.name.toLowerCase()} : +${fmt(res.litres)} L. ` +
-        `Nouvelle tentative depuis ${fmt(CONFIG.ALT_START)} ft — bats ton record !`, 6000);
-    } else {
-      toast(`${act.icon} Bravo ! ${minutes} min de ${act.name.toLowerCase()} : +${fmt(res.litres)} L de kérosène. En montée ! ▲`);
+
+    if (res.alreadyToday) {
+      toast(`${act.icon} Doucement ! La ${act.name.toLowerCase()}, c'est une seule prise par jour. 😄`);
+      refreshHUD();
+      return;
     }
-    keroseneRain(btnRect, Math.min(16, 6 + Math.round(minutes / 15)));
+
+    const doneTxt = act.fixed
+      ? `${act.name} avalée`
+      : `${minutes} min de ${act.name.toLowerCase()}`;
+    if (res.tookOff) {
+      toast(`🛫 REDÉCOLLAGE ! ${doneTxt} : +${fmt(res.litres)} L. ` +
+        `Nouvelle tentative depuis ${fmt(CONFIG.ALT_START)} ft — bats ton record !`, 6000);
+    } else if (act.fixed) {
+      toast(`${act.icon} ${doneTxt} : +${fmt(res.litres)} L de kérosène. Bonus du jour ! ▲`);
+    } else {
+      toast(`${act.icon} Bravo ! ${doneTxt} : +${fmt(res.litres)} L de kérosène. En montée ! ▲`);
+    }
+    keroseneRain(btnRect, act.fixed ? 5 : Math.min(16, 6 + Math.round(minutes / 15)));
     refreshHUD();
   }
 
@@ -227,11 +251,15 @@ const UI = (() => {
       const time = new Date(e.date).toLocaleTimeString('fr-FR',
         { hour: '2-digit', minute: '2-digit' });
       const mine = me && e.player === me.name;
+      const iconHtml = act.img
+        ? `<img class="j-img" src="${act.img}" alt="">`
+        : act.icon;
+      const detail = e.minutes > 0 ? `${act.name}, ${e.minutes} min` : act.name;
       html += `
         <div class="journal-row ${mine ? 'me' : ''}">
           <span class="j-time">${time}</span>
-          <span class="j-icon">${act.icon}</span>
-          <span class="j-text"><b>${escapeHtml(e.player)}</b> — ${act.name}, ${e.minutes} min</span>
+          <span class="j-icon">${iconHtml}</span>
+          <span class="j-text"><b>${escapeHtml(e.player)}</b> — ${detail}</span>
           <span class="j-gain">+${fmt(e.kero)} L ⛽</span>
         </div>`;
     }

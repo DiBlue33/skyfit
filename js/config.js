@@ -37,6 +37,9 @@ const CONFIG = {
     { id: 'natation',   name: 'Natation',    icon: '🏊', keroPerMin: 11 },
     { id: 'randonnee',  name: 'Randonnée',   icon: '🥾', keroPerMin: 7  },
     { id: 'autre',      name: 'Autre sport', icon: '💪', keroPerMin: 8  },
+    // Bonus nutrition : gain fixe, une seule fois par jour
+    { id: 'creatine',   name: 'Créatine',    icon: '💊', img: 'assets/icons/creatine.png',
+      fixed: true, keroBonus: 50, oncePerDay: true },
   ],
 
   // --- Boutique : avions (multiplicateur de vitesse) ---

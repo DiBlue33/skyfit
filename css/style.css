@@ -350,7 +350,19 @@ button {
 }
 
 .activity-choice .emoji { font-size: 1.6rem; display: block; margin-bottom: 4px; }
+.activity-choice .act-img {
+  width: 36px; height: 36px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 4px;
+}
 .activity-choice.selected { border-color: var(--accent); background: rgba(46, 134, 222, 0.08); }
+
+.journal-row .j-img {
+  width: 22px; height: 22px;
+  object-fit: contain;
+  vertical-align: middle;
+}
 
 .duration-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .duration-row input[type=range] { flex: 1; accent-color: var(--accent); }

@@ -104,7 +104,17 @@ const Engine = (() => {
    */
   function logActivity(player, activityId, minutes) {
     const act = CONFIG.ACTIVITIES.find(a => a.id === activityId);
-    if (!act || !(minutes > 0)) return { litres: 0, tookOff: false };
+    if (!act) return { litres: 0, tookOff: false };
+    if (act.fixed) minutes = 0;
+    else if (!(minutes > 0)) return { litres: 0, tookOff: false };
+
+    // Bonus limités à une prise par jour (ex : créatine)
+    if (act.oncePerDay) {
+      const today = new Date().toDateString();
+      const already = (player.activityLog || []).some(e =>
+        e.activityId === activityId && new Date(e.date).toDateString() === today);
+      if (already) return { litres: 0, tookOff: false, alreadyToday: true };
+    }
 
     let tookOff = false;
     if (player.crashed) {
@@ -114,7 +124,8 @@ const Engine = (() => {
       tookOff = true;
     }
 
-    const litres = act.keroPerMin * minutes * State.keroYield(player);
+    const litres = (act.fixed ? act.keroBonus : act.keroPerMin * minutes) *
+      State.keroYield(player);
     const cap = State.tankCapacity(player);
     const added = Math.min(litres, cap - player.kerosene);
     player.kerosene = Math.min(cap, player.kerosene + litres);
