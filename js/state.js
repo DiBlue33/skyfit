@@ -28,6 +28,9 @@ const State = (() => {
       // Journal des séances
       activityLog: [],             // { activityId, minutes, kero, date }
       totalSportMinutes: 0,
+      totalSessions: 0,            // nombre total de séances (jamais tronqué)
+      maxAltitude: CONFIG.ALT_START, // plus haute altitude atteinte
+      claimedAchievements: {},     // id de succès -> date de réclamation
     };
   }
 
@@ -84,6 +87,12 @@ const State = (() => {
       if (typeof p.pinHash !== 'string') p.pinHash = null;
       // Horodatage de synchro (v1.5)
       if (typeof p.updatedAt !== 'number') p.updatedAt = p.lastTick || Date.now();
+      // Succès (v1.8) — Firebase supprime les objets vides
+      if (!p.claimedAchievements || typeof p.claimedAchievements !== 'object') {
+        p.claimedAchievements = {};
+      }
+      if (typeof p.totalSessions !== 'number') p.totalSessions = p.activityLog.length;
+      if (typeof p.maxAltitude !== 'number') p.maxAltitude = Math.max(p.altitude || 0, CONFIG.ALT_START);
     });
   }
 

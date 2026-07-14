@@ -66,6 +66,7 @@ const UI = (() => {
     }
 
     refreshScoreboard();
+    Achievements.updateBadge();
     lastAlt = p.altitude;
   }
 
@@ -415,5 +416,5 @@ const UI = (() => {
     $('btn-switch-player').addEventListener('click', () => Auth.logout());
   }
 
-  return { bind, refreshHUD, toast, offlineSummary };
+  return { bind, refreshHUD, toast, offlineSummary, keroseneRain };
 })();

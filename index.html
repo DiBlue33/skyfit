@@ -34,6 +34,7 @@
     <div class="points-value">★ <span id="points">0</span> points</div>
     <div id="scoreboard"></div>
     <div class="top-buttons">
+      <button class="btn ghost small" id="btn-achievements" type="button">🏆<span id="ach-badge"></span></button>
       <button class="btn ghost small" id="btn-journal" type="button">📒 Activités</button>
       <button class="btn small" id="btn-map" type="button">🗺️ Carte</button>
       <button class="btn warm small" id="btn-shop" type="button">🛒 Boutique</button>
@@ -166,6 +167,20 @@
     </div>
   </div>
 
+  <!-- Modale : succès -->
+  <div class="modal-backdrop" id="modal-achievements">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>🏆 Succès</h2>
+        <button class="modal-close" data-close="modal-achievements" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="shop-points-banner" id="ach-summary"></div>
+        <div id="ach-body"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modale : journal des activités -->
   <div class="modal-backdrop" id="modal-journal">
     <div class="modal">
@@ -277,6 +292,7 @@
   <script src="js/ui.js"></script>
   <script src="js/worlddata.js"></script>
   <script src="js/map.js"></script>
+  <script src="js/achievements.js"></script>
   <script src="js/sync-config.js"></script>
   <script src="js/sync.js"></script>
   <script src="js/auth.js"></script>

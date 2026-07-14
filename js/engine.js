@@ -44,6 +44,7 @@ const Engine = (() => {
       // 2) Descente naturelle (toujours active)
       player.altitude -= decayPerS * dt;
       if (player.altitude > CONFIG.ALT_MAX) player.altitude = CONFIG.ALT_MAX;
+      if (player.altitude > (player.maxAltitude || 0)) player.maxAltitude = player.altitude;
 
       // 3) CRASH : altitude tombée à 0
       if (player.altitude <= CONFIG.ALT_MIN) {
@@ -139,6 +140,7 @@ const Engine = (() => {
     });
     if (player.activityLog.length > 200) player.activityLog.shift();
     player.totalSportMinutes += minutes;
+    player.totalSessions = (player.totalSessions || 0) + 1;
 
     State.save();
     return { litres: added, tookOff };

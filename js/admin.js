@@ -114,6 +114,8 @@ const Admin = (() => {
           ownedDecors: ['day'], currentDecor: 'day',
           upgrades: { yield: 0, aero: 0, tank: 0 },
           activityLog: [], totalSportMinutes: 0,
+          totalSessions: 0, maxAltitude: CONFIG.ALT_START,
+          claimedAchievements: {},
         });
         Scene.setPlane(p.currentPlane);
         Scene.setDecor(p.currentDecor);

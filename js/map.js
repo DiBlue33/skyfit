@@ -411,5 +411,12 @@ const WorldMap = (() => {
 
   document.addEventListener('DOMContentLoaded', bind);
 
-  return { open, close, positionForKm, TOTAL_KM };
+  /** Escales avec leur distance d'arrivée depuis Paris (pour les succès). */
+  function stops() {
+    const list = SEGS.slice(1).map(s => ({ name: s.from.name, km: s.start }));
+    list.push({ name: 'Paris', km: TOTAL_KM }); // retour = tour complet
+    return list;
+  }
+
+  return { open, close, positionForKm, stops, TOTAL_KM };
 })();
