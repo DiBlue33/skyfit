@@ -119,6 +119,8 @@ const Engine = (() => {
     const added = Math.min(litres, cap - player.kerosene);
     player.kerosene = Math.min(cap, player.kerosene + litres);
 
+    // Défense : Firebase peut avoir supprimé la liste si elle était vide
+    if (!Array.isArray(player.activityLog)) player.activityLog = [];
     player.activityLog.push({
       activityId, minutes,
       kero: Math.round(added),

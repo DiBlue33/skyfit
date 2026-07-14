@@ -756,6 +756,25 @@ button {
   filter: grayscale(0.7) brightness(0.92) drop-shadow(0 8px 12px rgba(10, 30, 50, 0.25));
 }
 
+/* Animation kérosène (validation d'une séance) */
+.kero-fly {
+  position: fixed;
+  z-index: 400;
+  font-size: 1.5rem;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 4px rgba(20, 40, 60, 0.3));
+}
+
+#hud-kero.kero-pulse {
+  animation: kero-pulse 0.45s ease;
+}
+
+@keyframes kero-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.06); box-shadow: 0 6px 28px rgba(243, 156, 18, 0.55); }
+  100% { transform: scale(1); }
+}
+
 /* Toast / résumé hors-ligne */
 #toast {
   position: fixed;

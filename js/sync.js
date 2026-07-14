@@ -87,7 +87,12 @@ const Sync = (() => {
         changed = true;
       }
     });
-    if (changed) State.save(null, true); // sauvegarde locale sans réestampiller
+    if (changed) {
+      // Firebase supprime les listes vides (ex : activityLog) et les null :
+      // on renormalise les profils avant de sauvegarder.
+      State.migrate();
+      State.save(null, true); // sauvegarde locale sans réestampiller
+    }
     return changed;
   }
 

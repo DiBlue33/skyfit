@@ -128,6 +128,8 @@ const UI = (() => {
   function confirmActivity() {
     const p = State.current();
     const minutes = parseInt($('duration-slider').value, 10);
+    // Point de départ de l'animation : le bouton Valider (avant fermeture)
+    const btnRect = $('btn-confirm-activity').getBoundingClientRect();
     const res = Engine.logActivity(p, selectedActivity, minutes);
     closeModal('modal-activity');
     const act = CONFIG.ACTIVITIES.find(a => a.id === selectedActivity);
@@ -137,7 +139,54 @@ const UI = (() => {
     } else {
       toast(`${act.icon} Bravo ! ${minutes} min de ${act.name.toLowerCase()} : +${fmt(res.litres)} L de kérosène. En montée ! ▲`);
     }
+    keroseneRain(btnRect, Math.min(16, 6 + Math.round(minutes / 15)));
     refreshHUD();
+  }
+
+  /**
+   * Pluie de kérosène : des ⛽ s'envolent du point de départ vers la
+   * jauge de kérosène (en haut à gauche), puis la jauge « pulse ».
+   */
+  function keroseneRain(fromRect, count) {
+    const target = $('hud-kero').getBoundingClientRect();
+    const tx = target.left + target.width * 0.5;
+    const ty = target.top + target.height * 0.55;
+    const sx = fromRect.left + fromRect.width / 2;
+    const sy = fromRect.top + fromRect.height / 2;
+
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement('span');
+      el.className = 'kero-fly';
+      el.textContent = '⛽';
+      // Petit éparpillement au départ
+      const ox = (Math.random() - 0.5) * 140;
+      const oy = (Math.random() - 0.5) * 80;
+      el.style.left = (sx + ox) + 'px';
+      el.style.top = (sy + oy) + 'px';
+      document.body.appendChild(el);
+
+      const dx = tx - (sx + ox);
+      const dy = ty - (sy + oy);
+      const anim = el.animate([
+        { transform: 'translate(0, 0) scale(0.6)', opacity: 0 },
+        { transform: 'translate(0, -14px) scale(1.15)', opacity: 1, offset: 0.18 },
+        { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 40}px) scale(1)`, opacity: 1, offset: 0.6 },
+        { transform: `translate(${dx}px, ${dy}px) scale(0.35)`, opacity: 0.2 },
+      ], {
+        duration: 750 + Math.random() * 350,
+        delay: i * 55,
+        easing: 'cubic-bezier(0.35, 0.1, 0.25, 1)',
+        fill: 'both',
+      });
+      anim.onfinish = () => {
+        el.remove();
+        // Pulse de la jauge à chaque arrivée
+        const hud = $('hud-kero');
+        hud.classList.remove('kero-pulse');
+        void hud.offsetWidth;
+        hud.classList.add('kero-pulse');
+      };
+    }
   }
 
   /* ---------- Journal des activités ---------- */

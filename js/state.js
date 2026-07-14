@@ -48,12 +48,26 @@ const State = (() => {
     return data;
   }
 
-  // Nettoie les sauvegardes issues d'anciennes versions
-  // (ex : identifiants d'avions/décors qui n'existent plus)
+  // Nettoie les sauvegardes issues d'anciennes versions ET les profils
+  // revenant du cloud : Firebase supprime les listes vides et les null,
+  // il faut donc recréer les champs manquants (sinon : plantages).
   function migrate() {
     const planeIds = CONFIG.PLANES.map(p => p.id);
     const decorIds = CONFIG.DECORS.map(d => d.id);
     Object.values(data.players).forEach(p => {
+      // Listes potentiellement perdues/déformées par Firebase
+      if (!Array.isArray(p.activityLog)) {
+        p.activityLog = p.activityLog ? Object.values(p.activityLog) : [];
+      }
+      if (!Array.isArray(p.ownedPlanes)) {
+        p.ownedPlanes = p.ownedPlanes ? Object.values(p.ownedPlanes) : [];
+      }
+      if (!Array.isArray(p.ownedDecors)) {
+        p.ownedDecors = p.ownedDecors ? Object.values(p.ownedDecors) : [];
+      }
+      if (!p.upgrades || typeof p.upgrades !== 'object') {
+        p.upgrades = { yield: 0, aero: 0, tank: 0 };
+      }
       p.ownedPlanes = (p.ownedPlanes || []).filter(id => planeIds.includes(id));
       if (!p.ownedPlanes.includes('cessna')) p.ownedPlanes.unshift('cessna');
       if (!planeIds.includes(p.currentPlane)) p.currentPlane = 'cessna';
@@ -154,7 +168,7 @@ const State = (() => {
   }
 
   return {
-    load, save, raw, addPlayer, selectPlayer, current, allPlayers, playerNames,
-    availablePoints, tankCapacity, keroYield, decayFactor, speedMult,
+    load, save, raw, migrate, addPlayer, selectPlayer, current, allPlayers,
+    playerNames, availablePoints, tankCapacity, keroYield, decayFactor, speedMult,
   };
 })();
