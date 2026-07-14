@@ -52,6 +52,8 @@ const CONFIG = {
       desc: 'Le best-seller du ciel. +55 % de vitesse.' },
     { id: 'a320',      name: 'Airbus A320',       cost: 15000,  speedMult: 1.75, width: 21,
       desc: 'Ligne majeure. +75 % de vitesse.' },
+    { id: 'a330',      name: 'Airbus A330',       cost: 25000,  speedMult: 1.85, width: 23,
+      desc: 'Long-courrier élégant. +85 % de vitesse.' },
     { id: 'falcon900', name: 'Falcon 900',        cost: 35000,  speedMult: 2.0,  width: 17,
       desc: 'Jet présidentiel. Vitesse x2.' },
     { id: 'a380',      name: 'Airbus A380',       cost: 80000,  speedMult: 2.2,  width: 25,
