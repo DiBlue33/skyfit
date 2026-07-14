@@ -175,6 +175,19 @@ const Achievements = (() => {
     const cap = State.tankCapacity(p);
     const added = Math.min(def.reward, Math.max(0, cap - p.kerosene));
     p.kerosene = Math.min(cap, p.kerosene + def.reward);
+
+    // Trace dans le journal des activités (visible par tous les pilotes)
+    if (!Array.isArray(p.activityLog)) p.activityLog = [];
+    p.activityLog.push({
+      activityId: 'achievement',
+      achName: def.name,
+      achIcon: def.icon,
+      minutes: 0,
+      kero: Math.round(added),
+      date: Date.now(),
+    });
+    if (p.activityLog.length > 200) p.activityLog.shift();
+
     State.save();
     Sync.push(p);
 

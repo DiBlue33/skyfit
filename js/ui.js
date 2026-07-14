@@ -247,15 +247,20 @@ const UI = (() => {
         html += `<div class="journal-day">${label}</div>`;
         lastDay = label;
       }
-      const act = CONFIG.ACTIVITIES.find(a => a.id === e.activityId) ||
-        { icon: '💪', name: e.activityId };
+      const isAch = e.activityId === 'achievement';
+      const act = isAch
+        ? { icon: e.achIcon || '🏆', name: `Succès « ${e.achName || '?'} »` }
+        : CONFIG.ACTIVITIES.find(a => a.id === e.activityId) ||
+          { icon: '💪', name: e.activityId };
       const time = new Date(e.date).toLocaleTimeString('fr-FR',
         { hour: '2-digit', minute: '2-digit' });
       const mine = me && e.player === me.name;
       const iconHtml = act.img
         ? `<img class="j-img" src="${act.img}" alt="">`
         : act.icon;
-      const detail = e.minutes > 0 ? `${act.name}, ${e.minutes} min` : act.name;
+      const detail = e.minutes > 0
+        ? `${escapeHtml(act.name)}, ${e.minutes} min`
+        : escapeHtml(act.name);
       html += `
         <div class="journal-row ${mine ? 'me' : ''}">
           <span class="j-time">${time}</span>
