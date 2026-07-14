@@ -112,6 +112,24 @@ button {
 
 .plane-svg, .plane-img { width: 100%; height: auto; display: block; }
 
+/* Hélice animée (spritesheet verticale à 3 frames) */
+.prop-overlay {
+  position: absolute;
+  background-size: 100% 300%;
+  background-repeat: no-repeat;
+  animation: prop-spin 0.14s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes prop-spin {
+  0%, 32.9%  { background-position: 0 0; }
+  33%, 65.9% { background-position: 0 50%; }
+  66%, 100%  { background-position: 0 100%; }
+}
+
+/* Hélice arrêtée quand l'avion est au sol (crashé) */
+#plane.crashed .prop-overlay { animation: none; opacity: 0.4; }
+
 /* ---------- Panneaux HUD ---------- */
 
 .hud {

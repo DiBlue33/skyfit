@@ -45,7 +45,9 @@ const CONFIG = {
     { id: 'cessna',    name: 'Cessna 172',        cost: 0,      speedMult: 1.0,  width: 13,
       desc: "L'avion-école des premiers décollages." },
     { id: 'tbm700',    name: 'TBM 700',           cost: 500,    speedMult: 1.15, width: 14,
-      desc: 'Turbopropulseur rapide. +15 % de vitesse.' },
+      desc: 'Turbopropulseur rapide. +15 % de vitesse.',
+      // Hélice animée : position/taille de l'overlay en % du sprite
+      prop: { left: 90.96, top: 37.91, width: 9.3, height: 62.75 } },
     { id: 'a220',      name: 'Airbus A220',       cost: 2000,   speedMult: 1.35, width: 19,
       desc: 'Moyen-courrier moderne. +35 % de vitesse.' },
     { id: 'b737',      name: 'Boeing 737',        cost: 6000,   speedMult: 1.55, width: 20,
