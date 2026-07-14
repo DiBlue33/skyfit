@@ -34,6 +34,7 @@
     <div class="points-value">★ <span id="points">0</span> points</div>
     <div id="scoreboard"></div>
     <div class="top-buttons">
+      <button class="btn ghost small" id="btn-journal" type="button">📒 Activités</button>
       <button class="btn small" id="btn-map" type="button">🗺️ Carte</button>
       <button class="btn warm small" id="btn-shop" type="button">🛒 Boutique</button>
     </div>
@@ -162,6 +163,17 @@
         </div>
         <div id="shop-content"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Modale : journal des activités -->
+  <div class="modal-backdrop" id="modal-journal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>📒 Journal des activités</h2>
+        <button class="modal-close" data-close="modal-journal" type="button">✕</button>
+      </div>
+      <div class="modal-body" id="journal-body"></div>
     </div>
   </div>
 

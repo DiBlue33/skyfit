@@ -52,9 +52,9 @@ const UI = (() => {
     const speed = p.crashed ? 0 : CONFIG.speedForAlt(p.altitude) * State.speedMult(p);
     $('speed-value').textContent = fmt(speed);
 
-    // Scène
+    // Scène (un avion qui a déjà crashé reste marqué à vie)
     Scene.update(p.altitude, speed);
-    Scene.setCrashed(p.crashed);
+    Scene.setCondition(p.crashed, (p.crashes || 0) > 0);
 
     // Panneau CRASH
     const overlay = $('crash-overlay');
@@ -138,6 +138,55 @@ const UI = (() => {
       toast(`${act.icon} Bravo ! ${minutes} min de ${act.name.toLowerCase()} : +${fmt(res.litres)} L de kérosène. En montée ! ▲`);
     }
     refreshHUD();
+  }
+
+  /* ---------- Journal des activités ---------- */
+
+  function refreshJournal() {
+    const me = State.current();
+    // Fusionne les journaux de tous les pilotes, du plus récent au plus ancien
+    const entries = State.allPlayers()
+      .flatMap(p => (p.activityLog || []).map(e => ({ ...e, player: p.name })))
+      .sort((a, b) => b.date - a.date)
+      .slice(0, 60);
+
+    if (!entries.length) {
+      $('journal-body').innerHTML =
+        '<p class="journal-empty">Aucune activité enregistrée pour l\'instant.<br>La première séance lance la course ! 🏁</p>';
+      return;
+    }
+
+    const dayLabel = (ts) => {
+      const d = new Date(ts);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const day = new Date(d); day.setHours(0, 0, 0, 0);
+      const diff = Math.round((today - day) / 86400000);
+      if (diff === 0) return "Aujourd'hui";
+      if (diff === 1) return 'Hier';
+      return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    };
+
+    let html = '', lastDay = null;
+    for (const e of entries) {
+      const label = dayLabel(e.date);
+      if (label !== lastDay) {
+        html += `<div class="journal-day">${label}</div>`;
+        lastDay = label;
+      }
+      const act = CONFIG.ACTIVITIES.find(a => a.id === e.activityId) ||
+        { icon: '💪', name: e.activityId };
+      const time = new Date(e.date).toLocaleTimeString('fr-FR',
+        { hour: '2-digit', minute: '2-digit' });
+      const mine = me && e.player === me.name;
+      html += `
+        <div class="journal-row ${mine ? 'me' : ''}">
+          <span class="j-time">${time}</span>
+          <span class="j-icon">${act.icon}</span>
+          <span class="j-text"><b>${escapeHtml(e.player)}</b> — ${act.name}, ${e.minutes} min</span>
+          <span class="j-gain">+${fmt(e.kero)} L ⛽</span>
+        </div>`;
+    }
+    $('journal-body').innerHTML = html;
   }
 
   /* ---------- Boutique ---------- */
@@ -271,6 +320,11 @@ const UI = (() => {
     $('btn-shop').addEventListener('click', () => {
       refreshShop();
       openModal('modal-shop');
+    });
+
+    $('btn-journal').addEventListener('click', () => {
+      refreshJournal();
+      openModal('modal-journal');
     });
     document.querySelectorAll('.shop-tab').forEach(tab =>
       tab.addEventListener('click', () => { shopTab = tab.dataset.tab; refreshShop(); }));

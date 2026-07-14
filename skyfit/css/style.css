@@ -25,7 +25,12 @@ html, body {
   user-select: none;
 }
 
-button { font-family: inherit; cursor: pointer; }
+button {
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
 
 /* ---------- Ciel & scène ---------- */
 
@@ -339,6 +344,54 @@ button { font-family: inherit; cursor: pointer; }
   padding: 10px 14px;
   font-size: 0.9rem;
   margin: 12px 0 16px;
+}
+
+/* Journal des activités */
+.journal-day {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  font-weight: 700;
+  margin: 14px 0 6px;
+}
+
+.journal-day:first-child { margin-top: 4px; }
+
+.journal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 9px 12px;
+  margin-bottom: 6px;
+  font-size: 0.88rem;
+}
+
+.journal-row.me { border-color: rgba(46, 134, 222, 0.45); background: rgba(46, 134, 222, 0.05); }
+
+.journal-row .j-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  min-width: 42px;
+}
+
+.journal-row .j-icon { font-size: 1.15rem; }
+.journal-row .j-text { flex: 1; }
+.journal-row .j-gain {
+  color: var(--accent-warm);
+  font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.journal-empty {
+  text-align: center;
+  color: var(--text-soft);
+  padding: 20px 0;
+  line-height: 1.6;
 }
 
 /* Boutique */
@@ -697,6 +750,12 @@ button { font-family: inherit; cursor: pointer; }
   animation: none;
 }
 
+/* Avion « vétéran » : a déjà crashé au moins une fois, il en garde
+   les traces (grisé) pour la suite de la partie */
+#plane.damaged {
+  filter: grayscale(0.7) brightness(0.92) drop-shadow(0 8px 12px rgba(10, 30, 50, 0.25));
+}
+
 /* Toast / résumé hors-ligne */
 #toast {
   position: fixed;
@@ -731,13 +790,100 @@ button { font-family: inherit; cursor: pointer; }
   text-decoration: underline;
 }
 
-/* ---------- Responsive ---------- */
+/* ---------- Responsive (téléphones) ---------- */
 
 @media (max-width: 640px) {
-  #hud-kero { min-width: 160px; }
-  #hud-stats { min-width: 170px; }
-  .km-value { font-size: 1.15rem; }
-  .altimeter { width: 100px; height: 100px; }
-  .hud { padding: 10px 12px; }
-  #plane { width: 130px; }
+  .hud { padding: 9px 11px; border-radius: 12px; }
+  .hud h3 { font-size: 0.6rem; margin-bottom: 3px; }
+
+  /* Deux panneaux compacts côte à côte en haut */
+  #hud-kero {
+    top: 8px; left: 8px;
+    width: calc(46% - 12px);
+    min-width: 0;
+  }
+  .kero-value { font-size: 0.9rem; }
+  .kero-bar { height: 10px; }
+  #current-player-badge { font-size: 0.68rem; margin-top: 4px; }
+  #current-player-badge button { font-size: 0.68rem; }
+
+  #hud-stats {
+    top: 8px; right: 8px;
+    width: calc(54% - 12px);
+    min-width: 0;
+  }
+  .km-value { font-size: 1.05rem; }
+  .points-value { font-size: 0.78rem; }
+  #scoreboard { margin-top: 6px; padding-top: 5px; }
+  .score-row { font-size: 0.72rem; gap: 8px; }
+  .score-record { font-size: 0.62rem; }
+
+  #hud-stats .top-buttons {
+    margin-top: 7px;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .btn.small { padding: 6px 8px; font-size: 0.7rem; border-radius: 8px; }
+
+  /* Altimètre compact, au-dessus de la barre du bas */
+  #hud-alt { bottom: 74px; right: 8px; padding: 8px 10px; }
+  .altimeter { width: 86px; height: 86px; }
+  .altimeter svg { width: 100%; height: 100%; }
+  .alt-value { font-size: 0.9rem; }
+  .alt-unit { font-size: 0.58rem; }
+  .alt-trend { font-size: 0.62rem; }
+  .speed-line { font-size: 0.68rem; margin-top: 4px; }
+
+  /* Barre d'action en bas, pleine largeur */
+  #hud-activity {
+    bottom: 8px; left: 8px; right: 8px;
+    padding: 8px;
+  }
+  #btn-add-activity { flex: 1; padding: 12px 10px; font-size: 0.92rem; }
+
+  /* Avion un peu plus petit pour laisser de la place au HUD */
+  #plane { left: 4%; }
+
+  /* Modales plein écran confortable */
+  .modal { width: calc(100vw - 16px); max-height: 86vh; border-radius: 16px; }
+  .modal-header { padding: 14px 16px 8px; }
+  .modal-header h2 { font-size: 1.05rem; }
+  .modal-body { padding: 4px 14px 16px; }
+
+  .activity-grid { gap: 7px; }
+  .activity-choice { padding: 9px 4px; font-size: 0.74rem; }
+  .activity-choice .emoji { font-size: 1.3rem; }
+  .duration-value { font-size: 0.95rem; min-width: 64px; }
+  .gain-preview { font-size: 0.82rem; padding: 8px 11px; }
+
+  .shop-item { padding: 10px 11px; gap: 8px; }
+  .shop-item .name { font-size: 0.9rem; }
+  .shop-item .desc { font-size: 0.74rem; }
+  .shop-tab { padding: 7px 10px; font-size: 0.76rem; }
+
+  .journal-row { font-size: 0.8rem; padding: 8px 10px; gap: 7px; }
+  .journal-row .j-gain { font-size: 0.74rem; }
+
+  /* Accueil */
+  .home-card { padding: 22px 18px; }
+  .home-logo .logo-plane { font-size: 2.4rem; }
+  .home-logo h1 { font-size: 2rem; }
+  .home-score-row { font-size: 0.84rem; padding: 8px 11px; }
+  .pin-pad { grid-template-columns: repeat(3, 64px); gap: 8px; }
+  .pin-pad button { height: 50px; font-size: 1.15rem; }
+
+  /* Panneau crash */
+  .crash-panel { padding: 24px 20px; }
+  .crash-title { font-size: 1.9rem; }
+  .crash-text { font-size: 0.88rem; }
+
+  /* Carte */
+  .map-player { flex-wrap: wrap; gap: 6px; }
+  .map-player .mp-info { font-size: 0.72rem; }
+}
+
+/* Très petits écrans */
+@media (max-width: 380px) {
+  .km-value { font-size: 0.95rem; }
+  .pin-pad { grid-template-columns: repeat(3, 58px); }
 }

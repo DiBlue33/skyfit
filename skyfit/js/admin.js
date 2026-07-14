@@ -117,6 +117,7 @@ const Admin = (() => {
         });
         Scene.setPlane(p.currentPlane);
         Scene.setDecor(p.currentDecor);
+        Scene.setCondition(false, false);
         UI.toast('🔧 Pilote réinitialisé');
         break;
     }

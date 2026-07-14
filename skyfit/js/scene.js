@@ -103,9 +103,15 @@ const Scene = (() => {
     skyEl.style.setProperty('--speed-factor', speedFactor.toFixed(2));
   }
 
-  function setCrashed(isCrashed) {
+  /**
+   * État visuel de l'avion :
+   * - crashed : au sol, grisé et penché
+   * - damaged : a déjà crashé au moins une fois → reste grisé en vol
+   */
+  function setCondition(isCrashed, isDamaged) {
     plane.classList.toggle('crashed', isCrashed);
+    plane.classList.toggle('damaged', !isCrashed && isDamaged);
   }
 
-  return { init, setDecor, setPlane, setCrashed, update };
+  return { init, setDecor, setPlane, setCondition, update };
 })();
