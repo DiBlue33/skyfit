@@ -68,14 +68,46 @@ const Sync = (() => {
   // Un pilote supprimé laisse une « pierre tombale » dans /deleted :
   // les autres appareils l'effacent localement et ne le re-poussent pas.
 
+  // Pierres tombales intégrées au code : purge automatique sur tous les
+  // appareils, même sans action manuelle. Un pilote du même nom peut être
+  // recréé après la date indiquée.
+  const BUILTIN_TOMBSTONES = {
+    'Test': 1784200000000, // purge demandée par Diego le 16/07/2026
+  };
+
   async function fetchDeleted() {
-    if (!enabled()) return {};
-    try {
-      const res = await fetch(`${baseUrl()}/deleted.json`, { cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return (await res.json()) || {};
-    } catch (e) {
-      return {};
+    let deleted = {};
+    if (enabled()) {
+      try {
+        const res = await fetch(`${baseUrl()}/deleted.json`, { cache: 'no-store' });
+        if (res.ok) deleted = (await res.json()) || {};
+      } catch (e) { /* hors-ligne : on garde les intégrées */ }
+    }
+    for (const [name, ts] of Object.entries(BUILTIN_TOMBSTONES)) {
+      const key = keyFor(name);
+      if (!(typeof deleted[key] === 'number' && deleted[key] >= ts)) {
+        deleted[key] = ts;
+      }
+    }
+    return deleted;
+  }
+
+  /** Nettoie le cloud : supprime les profils sous tombstone et publie
+      les tombstones intégrées manquantes. */
+  async function cleanupCloud(cloudPlayers, deleted) {
+    if (!enabled() || !cloudPlayers) return;
+    for (const [key, cp] of Object.entries(cloudPlayers)) {
+      if (!cp || !cp.name) continue;
+      if (tombstoneFor(deleted, cp)) {
+        try {
+          const ts = deleted[keyFor(cp.name)];
+          await fetch(`${baseUrl()}/deleted/${keyFor(cp.name)}.json`, {
+            method: 'PUT', body: JSON.stringify(ts),
+          });
+          await fetch(`${baseUrl()}/players/${key}.json`, { method: 'DELETE' });
+          delete cloudPlayers[key];
+        } catch (e) { /* réessaiera à la prochaine synchro */ }
+      }
     }
   }
 
@@ -130,7 +162,7 @@ const Sync = (() => {
    * EN JEU sur cet appareil n'est jamais écrasé (il fait autorité).
    * Retourne true si quelque chose a changé localement.
    */
-  function mergeIntoLocal(cloudPlayers) {
+  function mergeIntoLocal(cloudPlayers, deleted) {
     if (!cloudPlayers) return false;
     const data = State.raw();
     const activeName = isPlaying() && State.current() ? State.current().name : null;
@@ -139,6 +171,7 @@ const Sync = (() => {
     Object.values(cloudPlayers).forEach(cp => {
       if (!cp || !cp.name) return;
       if (cp.name === activeName) return;
+      if (deleted && tombstoneFor(deleted, cp)) return; // pilote supprimé
       const lp = data.players[cp.name];
       if (!lp || (cp.updatedAt || 0) > (lp.updatedAt || 0)) {
         data.players[cp.name] = cp;
@@ -169,12 +202,13 @@ const Sync = (() => {
 
   /** Synchronisation complète : tombstones, pull, fusion, push. */
   async function fullSync() {
-    if (!enabled()) return false;
     const deleted = await fetchDeleted();
-    let changed = applyTombstones(deleted);
+    let changed = applyTombstones(deleted); // purge locale (même hors-ligne)
+    if (!enabled()) return changed;
     const cloud = await pullAll();
     if (cloud === null) return changed;
-    changed = mergeIntoLocal(cloud) || changed;
+    await cleanupCloud(cloud, deleted);
+    changed = mergeIntoLocal(cloud, deleted) || changed;
     await pushNewer(cloud, deleted);
     return changed;
   }
@@ -196,8 +230,10 @@ const Sync = (() => {
         await push(State.current());
       }
       // Rafraîchit les autres profils (classement, carte)
+      const deleted = await fetchDeleted();
+      applyTombstones(deleted);
       const cloud = await pullAll();
-      if (cloud && mergeIntoLocal(cloud)) {
+      if (cloud && mergeIntoLocal(cloud, deleted)) {
         if (isPlaying()) UI.refreshHUD();
         else Auth.refreshHome();
       }
