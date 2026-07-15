@@ -38,7 +38,7 @@ const CONFIG = {
     { id: 'natation',   name: 'Natation',    icon: '🏊', keroPerMin: 11 },
     { id: 'padel',      name: 'Padel',       icon: '🏓', keroPerMin: 7  },
     { id: 'tennis',     name: 'Tennis',      icon: '🎾', keroPerMin: 8  },
-    { id: 'pilates',    name: 'Pilates',     icon: '🤸', keroPerMin: 5  },
+    { id: 'pilates',    name: 'Pilates',     icon: '🤸', keroPerMin: 8  }, // aussi intense que la muscu (validé par Jade)
     { id: 'yoga',       name: 'Yoga',        icon: '🧘', keroPerMin: 4  },
     // Bonus nutrition : gain fixe, une seule fois par jour
     { id: 'creatine',   name: 'Créatine',    icon: '💊', img: 'assets/icons/creatine.png',
