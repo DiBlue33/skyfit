@@ -64,6 +64,64 @@ const Sync = (() => {
     }
   }
 
+  /* ---------- Suppression de pilotes (tombstones) ---------- */
+  // Un pilote supprimé laisse une « pierre tombale » dans /deleted :
+  // les autres appareils l'effacent localement et ne le re-poussent pas.
+
+  async function fetchDeleted() {
+    if (!enabled()) return {};
+    try {
+      const res = await fetch(`${baseUrl()}/deleted.json`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return (await res.json()) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function tombstoneFor(deleted, player) {
+    const ts = deleted[keyFor(player.name)];
+    // La pierre tombale ne vaut que pour les profils créés AVANT elle
+    // (on peut donc recréer un pilote du même nom ensuite)
+    return (typeof ts === 'number' && ts > (player.createdAt || 0)) ? ts : null;
+  }
+
+  function applyTombstones(deleted) {
+    if (!deleted) return false;
+    const data = State.raw();
+    let changed = false;
+    for (const name of Object.keys(data.players)) {
+      if (tombstoneFor(deleted, data.players[name])) {
+        delete data.players[name];
+        if (data.currentPlayer === name) data.currentPlayer = null;
+        changed = true;
+      }
+    }
+    if (changed) State.save(null, true);
+    return changed;
+  }
+
+  /** Supprime un pilote partout : localement, dans le cloud, + tombstone. */
+  async function deletePlayer(name) {
+    const data = State.raw();
+    const player = data.players[name];
+    delete data.players[name];
+    if (data.currentPlayer === name) data.currentPlayer = null;
+    State.save(null, true);
+
+    if (enabled() && player) {
+      try {
+        await fetch(`${baseUrl()}/deleted/${keyFor(name)}.json`, {
+          method: 'PUT', body: JSON.stringify(Date.now()),
+        });
+        await fetch(`${baseUrl()}/players/${keyFor(name)}.json`, { method: 'DELETE' });
+        lastOk = Date.now(); lastError = false;
+      } catch (e) {
+        console.warn('Suppression cloud impossible :', e.message);
+      }
+    }
+  }
+
   /* ---------- Fusion cloud <-> local ---------- */
 
   /**
@@ -97,9 +155,10 @@ const Sync = (() => {
   }
 
   /** Pousse les profils locaux plus récents (ou absents) vers le cloud. */
-  async function pushNewer(cloudPlayers) {
+  async function pushNewer(cloudPlayers, deleted) {
     const cloud = cloudPlayers || {};
     for (const lp of State.allPlayers()) {
+      if (deleted && tombstoneFor(deleted, lp)) continue; // supprimé ailleurs
       const cp = cloud[lp.name] ||
         Object.values(cloud).find(c => c && c.name === lp.name);
       if (!cp || (lp.updatedAt || 0) > (cp.updatedAt || 0)) {
@@ -108,13 +167,15 @@ const Sync = (() => {
     }
   }
 
-  /** Synchronisation complète : pull, fusion, push de ce qui est plus récent. */
+  /** Synchronisation complète : tombstones, pull, fusion, push. */
   async function fullSync() {
     if (!enabled()) return false;
+    const deleted = await fetchDeleted();
+    let changed = applyTombstones(deleted);
     const cloud = await pullAll();
-    if (cloud === null) return false;
-    const changed = mergeIntoLocal(cloud);
-    await pushNewer(cloud);
+    if (cloud === null) return changed;
+    changed = mergeIntoLocal(cloud) || changed;
+    await pushNewer(cloud, deleted);
     return changed;
   }
 
@@ -167,5 +228,8 @@ const Sync = (() => {
     if (el) el.textContent = statusText();
   }
 
-  return { enabled, pullAll, push, mergeIntoLocal, fullSync, startLoop, statusText, updateBadge };
+  return {
+    enabled, pullAll, push, mergeIntoLocal, fullSync, deletePlayer,
+    startLoop, statusText, updateBadge,
+  };
 })();

@@ -17,6 +17,11 @@ const Admin = (() => {
     if (!p) return;
     $('admin-alt-slider').value = Math.round(p.altitude);
     $('admin-alt-value').textContent = fmt(p.altitude);
+    // Liste des pilotes supprimables (tous sauf le pilote connecté)
+    $('admin-delete-select').innerHTML = State.allPlayers()
+      .filter(pl => pl.name !== p.name)
+      .map(pl => `<option value="${pl.name.replace(/"/g, '&quot;')}">${pl.name}</option>`)
+      .join('') || '<option value="">(aucun autre pilote)</option>';
     $('modal-admin').classList.add('open');
   }
 
@@ -99,6 +104,19 @@ const Admin = (() => {
         CONFIG.UPGRADES.forEach(u => { p.upgrades[u.id] = u.maxLevel; });
         UI.toast('🔧 Tout est débloqué !');
         break;
+
+      case 'delete-player': {
+        const name = $('admin-delete-select').value;
+        if (!name) { UI.toast('🔧 Aucun pilote sélectionné'); return; }
+        if (!confirm(`Supprimer définitivement le pilote « ${name} » ` +
+          `(partout, y compris en ligne) ?`)) return;
+        Sync.deletePlayer(name).then(() => {
+          UI.toast(`🔧 Pilote « ${name} » supprimé partout`);
+          UI.refreshHUD();
+        });
+        $('modal-admin').classList.remove('open');
+        return; // deletePlayer sauvegarde lui-même
+      }
 
       case 'reset-player':
         if (!confirm(`Réinitialiser complètement le pilote « ${p.name} » ?`)) return;

@@ -46,7 +46,8 @@ const CONFIG = {
   // width : largeur d'affichage à l'écran (en vw, bornée en px)
   PLANES: [
     { id: 'cessna',    name: 'Cessna 172',        cost: 0,      speedMult: 1.0,  width: 13,
-      desc: "L'avion-école des premiers décollages." },
+      desc: "L'avion-école des premiers décollages.",
+      prop: { left: 94.22, top: 14.18, width: 5.78, height: 67.38 } },
     { id: 'tbm700',    name: 'TBM 700',           cost: 500,    speedMult: 1.15, width: 14,
       desc: 'Turbopropulseur rapide. +15 % de vitesse.',
       // Hélice animée : position/taille de l'overlay en % du sprite

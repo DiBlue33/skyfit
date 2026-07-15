@@ -261,6 +261,18 @@ button {
 
 .admin-row.slider-row input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent); }
 
+#admin-delete-select {
+  flex: 1;
+  min-width: 110px;
+  border: 1px solid var(--panel-border);
+  border-radius: 9px;
+  padding: 7px 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: #fff;
+}
+
 .btn {
   border: none;
   border-radius: 12px;
