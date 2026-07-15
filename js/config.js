@@ -30,17 +30,26 @@ const CONFIG = {
   KM_PER_POINT: 10,    // 10 km parcourus = 1 point
 
   // --- Activités sportives (litres de kérosène par minute) ---
+  // Rendements calés sur l'intensité de l'effort
   ACTIVITIES: [
     { id: 'running',    name: 'Running',     icon: '🏃', keroPerMin: 10 },
     { id: 'musculation',name: 'Musculation', icon: '🏋️', keroPerMin: 8  },
-    { id: 'velo',       name: 'Vélo',        icon: '🚴', keroPerMin: 9  },
+    { id: 'velo',       name: 'Vélo',        icon: '🚲', keroPerMin: 5  }, // vélo de ville (déplacements)
     { id: 'natation',   name: 'Natation',    icon: '🏊', keroPerMin: 11 },
-    { id: 'randonnee',  name: 'Randonnée',   icon: '🥾', keroPerMin: 7  },
-    { id: 'autre',      name: 'Autre sport', icon: '💪', keroPerMin: 8  },
+    { id: 'padel',      name: 'Padel',       icon: '🏓', keroPerMin: 7  },
+    { id: 'tennis',     name: 'Tennis',      icon: '🎾', keroPerMin: 8  },
+    { id: 'pilates',    name: 'Pilates',     icon: '🤸', keroPerMin: 5  },
+    { id: 'yoga',       name: 'Yoga',        icon: '🧘', keroPerMin: 4  },
     // Bonus nutrition : gain fixe, une seule fois par jour
     { id: 'creatine',   name: 'Créatine',    icon: '💊', img: 'assets/icons/creatine.png',
       fixed: true, keroBonus: 50, oncePerDay: true },
   ],
+
+  // Anciennes activités retirées (affichage du journal historique)
+  LEGACY_ACTIVITIES: {
+    randonnee: { icon: '🥾', name: 'Randonnée' },
+    autre:     { icon: '💪', name: 'Autre sport' },
+  },
 
   // --- Boutique : avions (multiplicateur de vitesse) ---
   // width : largeur d'affichage à l'écran (en vw, bornée en px)

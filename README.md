@@ -55,9 +55,12 @@ Les points d'achat, avions et améliorations ne sont jamais perdus.
 |---|---|
 | Natation | 11 |
 | Running | 10 |
-| Vélo | 9 |
-| Musculation / Autre | 8 |
-| Randonnée | 7 |
+| Musculation / Tennis | 8 |
+| Padel | 7 |
+| Vélo (ville) / Pilates | 5 |
+| Yoga | 4 |
+
+Bonus : Créatine 💊 = +50 L, une prise par jour.
 
 ## Boutique
 

@@ -251,6 +251,7 @@ const UI = (() => {
       const act = isAch
         ? { icon: e.achIcon || '🏆', name: `Succès « ${e.achName || '?'} »` }
         : CONFIG.ACTIVITIES.find(a => a.id === e.activityId) ||
+          (CONFIG.LEGACY_ACTIVITIES || {})[e.activityId] ||
           { icon: '💪', name: e.activityId };
       const time = new Date(e.date).toLocaleTimeString('fr-FR',
         { hour: '2-digit', minute: '2-digit' });
