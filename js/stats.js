@@ -140,8 +140,11 @@ const Stats = (() => {
         (map[key] = map[key] || []).push({
           time: d.getHours() * 60 + d.getMinutes(),
           hm: d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+          hmEnd: new Date(d.getTime() + (e.minutes || 0) * 60000)
+            .toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           act: actInfo(e.activityId),
           minutes: e.minutes || 0,
+          kero: e.kero || 0,
           player: p.name,
           color,
         });
@@ -151,6 +154,9 @@ const Stats = (() => {
     return map;
   }
 
+  let lastByDay = {};       // cache pour le détail au clic
+  let selectedDayKey = null;
+
   function renderCalendar() {
     const y = calMonth.getFullYear(), m = calMonth.getMonth();
     $('cal-title').textContent = calMonth
@@ -158,6 +164,7 @@ const Stats = (() => {
       .replace(/^./, c => c.toUpperCase());
 
     const byDay = sessionsByDay();
+    lastByDay = byDay;
     const firstIdx = (new Date(y, m, 1).getDay() + 6) % 7; // lundi = 0
     const daysInMonth = new Date(y, m + 1, 0).getDate();
     const today = new Date();
@@ -169,7 +176,8 @@ const Stats = (() => {
     for (let i = 0; i < firstIdx; i++) html += '<div class="cal-cell empty"></div>';
 
     for (let d = 1; d <= daysInMonth; d++) {
-      const list = byDay[`${y}-${m}-${d}`] || [];
+      const key = `${y}-${m}-${d}`;
+      const list = byDay[key] || [];
       const chips = list.slice(0, 3).map(s => `
         <span class="cal-chip" style="background:${s.color}"
           title="${s.player} — ${s.act.name}${s.minutes ? ', ' + s.minutes + ' min' : ''} à ${s.hm}">
@@ -177,12 +185,17 @@ const Stats = (() => {
       const more = list.length > 3
         ? `<span class="cal-more">+${list.length - 3}</span>` : '';
       html += `
-        <div class="cal-cell ${isToday(d) ? 'today' : ''}">
+        <div class="cal-cell ${isToday(d) ? 'today' : ''} ${key === selectedDayKey ? 'selected' : ''}"
+             data-day="${key}" data-date="${d}">
           <span class="cal-date">${d}</span>
           ${chips}${more}
         </div>`;
     }
     $('cal-grid').innerHTML = html;
+
+    // Clic sur un jour → détail des séances
+    $('cal-grid').querySelectorAll('.cal-cell[data-day]').forEach(cell =>
+      cell.addEventListener('click', () => showDayDetail(cell.dataset.day, cell.dataset.date)));
 
     // Légende des pilotes
     $('cal-legend').innerHTML = State.allPlayers().map(p => `
@@ -190,8 +203,57 @@ const Stats = (() => {
       ${p.name}</span>`).join('');
   }
 
+  /* ---------- Détail d'un jour ---------- */
+
+  function showDayDetail(key, dayNum) {
+    // Re-cliquer sur le jour sélectionné referme le détail
+    if (selectedDayKey === key) { hideDayDetail(); return; }
+    selectedDayKey = key;
+
+    // Surbrillance de la case
+    $('cal-grid').querySelectorAll('.cal-cell').forEach(c =>
+      c.classList.toggle('selected', c.dataset.day === key));
+
+    const date = new Date(calMonth.getFullYear(), calMonth.getMonth(), parseInt(dayNum, 10));
+    const label = date.toLocaleDateString('fr-FR',
+      { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      .replace(/^./, c => c.toUpperCase());
+
+    const list = lastByDay[key] || [];
+    const fmtL = (n) => Math.floor(n).toLocaleString('fr-FR');
+    const rows = list.length ? list.map(s => `
+      <div class="cd-row">
+        <span class="cd-dot" style="background:${s.color}"></span>
+        <span class="cd-time">${s.minutes ? `${s.hm} → ${s.hmEnd}` : s.hm}</span>
+        <span class="cd-icon">${s.act.img ? `<img class="j-img" src="${s.act.img}" alt="">` : s.act.icon}</span>
+        <span class="cd-text"><b>${s.player}</b> — ${s.act.name}${s.minutes ? `, ${s.minutes} min` : ''}</span>
+        <span class="cd-kero">+${fmtL(s.kero)} L</span>
+      </div>`).join('')
+      : '<p class="cd-empty">Aucune séance ce jour-là… jour de repos ? 😴</p>';
+
+    $('cal-detail').innerHTML = `
+      <div class="cd-header">
+        <span class="cd-title">${label}</span>
+        <button class="modal-close cd-close" type="button">✕</button>
+      </div>
+      ${rows}`;
+    $('cal-detail').classList.add('open');
+    $('cal-detail').querySelector('.cd-close')
+      .addEventListener('click', hideDayDetail);
+    $('cal-detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function hideDayDetail() {
+    selectedDayKey = null;
+    $('cal-detail').classList.remove('open');
+    $('cal-detail').innerHTML = '';
+    $('cal-grid').querySelectorAll('.cal-cell.selected').forEach(c =>
+      c.classList.remove('selected'));
+  }
+
   function changeMonth(delta) {
     calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + delta, 1);
+    hideDayDetail();
     renderCalendar();
   }
 
@@ -200,6 +262,7 @@ const Stats = (() => {
   function open() {
     const now = new Date();
     calMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    hideDayDetail();
     renderStats();
     renderCalendar();
     $('modal-stats').classList.add('open');
