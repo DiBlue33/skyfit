@@ -115,6 +115,22 @@ const UI = (() => {
     });
   }
 
+  /** Remplit les champs date/heure avec « maintenant ». */
+  function resetSessionWhen() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    $('session-date').value =
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    $('session-time').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  }
+
+  /** Timestamp (ms) du début de séance choisi, ou maintenant si invalide. */
+  function sessionWhen() {
+    const d = $('session-date').value, t = $('session-time').value;
+    const ts = new Date(`${d}T${t || '12:00'}`).getTime();
+    return isFinite(ts) ? ts : Date.now();
+  }
+
   function refreshGainPreview() {
     const p = State.current();
     const act = CONFIG.ACTIVITIES.find(a => a.id === selectedActivity);
@@ -133,9 +149,14 @@ const UI = (() => {
     $('duration-value').textContent = minutes;
     const litres = Math.round(act.keroPerMin * minutes * State.keroYield(p));
     const climb = Math.round(litres * CONFIG.CLIMB_FT_PER_LITRE);
+    // Heure de fin déduite du début + durée
+    const start = new Date(sessionWhen());
+    const end = new Date(start.getTime() + minutes * 60000);
+    const hm = (d) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     $('gain-preview').innerHTML =
       `⛽ Cette séance rapportera <b>${fmt(litres)} L</b> de kérosène,` +
-      ` soit jusqu'à <b>+${fmt(climb)} ft</b> d'altitude.`;
+      ` soit jusqu'à <b>+${fmt(climb)} ft</b> d'altitude.` +
+      `<br><small>🕒 De ${hm(start)} à ${hm(end)}</small>`;
   }
 
   function confirmActivity() {
@@ -143,7 +164,7 @@ const UI = (() => {
     const minutes = parseInt($('duration-slider').value, 10);
     // Point de départ de l'animation : le bouton Valider (avant fermeture)
     const btnRect = $('btn-confirm-activity').getBoundingClientRect();
-    const res = Engine.logActivity(p, selectedActivity, minutes);
+    const res = Engine.logActivity(p, selectedActivity, minutes, sessionWhen());
     closeModal('modal-activity');
     const act = CONFIG.ACTIVITIES.find(a => a.id === selectedActivity);
 
@@ -389,16 +410,20 @@ const UI = (() => {
   function bind() {
     $('btn-add-activity').addEventListener('click', () => {
       buildActivityGrid();
+      resetSessionWhen();
       refreshGainPreview();
       openModal('modal-activity');
     });
     // Bouton du panneau CRASH : ouvre directement l'ajout de séance
     $('btn-crash-restart').addEventListener('click', () => {
       buildActivityGrid();
+      resetSessionWhen();
       refreshGainPreview();
       openModal('modal-activity');
     });
     $('duration-slider').addEventListener('input', refreshGainPreview);
+    $('session-date').addEventListener('change', refreshGainPreview);
+    $('session-time').addEventListener('change', refreshGainPreview);
     $('btn-confirm-activity').addEventListener('click', confirmActivity);
 
     $('btn-shop').addEventListener('click', () => {

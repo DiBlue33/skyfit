@@ -103,17 +103,20 @@ const Engine = (() => {
    * Si l'avion est crashé, la séance le fait REDÉCOLLER.
    * Retourne { litres ajoutés, tookOff }.
    */
-  function logActivity(player, activityId, minutes) {
+  function logActivity(player, activityId, minutes, when) {
     const act = CONFIG.ACTIVITIES.find(a => a.id === activityId);
     if (!act) return { litres: 0, tookOff: false };
     if (act.fixed) minutes = 0;
     else if (!(minutes > 0)) return { litres: 0, tookOff: false };
 
-    // Bonus limités à une prise par jour (ex : créatine)
+    // Date/heure de début de la séance (choisie par le joueur, sinon maintenant)
+    const ts = (typeof when === 'number' && isFinite(when)) ? when : Date.now();
+
+    // Bonus limités à une prise par jour (ex : créatine) — jour de la séance
     if (act.oncePerDay) {
-      const today = new Date().toDateString();
+      const day = new Date(ts).toDateString();
       const already = (player.activityLog || []).some(e =>
-        e.activityId === activityId && new Date(e.date).toDateString() === today);
+        e.activityId === activityId && new Date(e.date).toDateString() === day);
       if (already) return { litres: 0, tookOff: false, alreadyToday: true };
     }
 
@@ -136,9 +139,10 @@ const Engine = (() => {
     player.activityLog.push({
       activityId, minutes,
       kero: Math.round(added),
-      date: Date.now(),
+      date: ts,             // début de la séance
+      loggedAt: Date.now(), // moment de l'enregistrement
     });
-    if (player.activityLog.length > 200) player.activityLog.shift();
+    if (player.activityLog.length > 500) player.activityLog.shift();
     player.totalSportMinutes += minutes;
     player.totalSessions = (player.totalSessions || 0) + 1;
 

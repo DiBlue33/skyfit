@@ -59,10 +59,36 @@
     <div class="speed-line">Vitesse : <b id="speed-value">250</b> km/h</div>
   </div>
 
-  <!-- HUD : ajout d'activité (bas gauche) -->
+  <!-- HUD : statistiques + ajout d'activité (bas gauche) -->
   <div class="hud" id="hud-activity">
-    <button class="btn" id="btn-add-activity" type="button">➕ Ajouter une séance de sport</button>
-    <button class="btn ghost small" id="btn-admin" type="button" title="Menu de test (temporaire)">🔧</button>
+    <button class="btn ghost" id="btn-stats" type="button">📊 Statistiques &amp; Calendrier</button>
+    <div class="activity-row">
+      <button class="btn" id="btn-add-activity" type="button">➕ Ajouter une séance de sport</button>
+      <button class="btn ghost small" id="btn-admin" type="button" title="Menu de test (temporaire)">🔧</button>
+    </div>
+  </div>
+
+  <!-- Modale : statistiques & calendrier -->
+  <div class="modal-backdrop" id="modal-stats">
+    <div class="modal modal-stats">
+      <div class="modal-header">
+        <h2>📊 Statistiques</h2>
+        <button class="modal-close" data-close="modal-stats" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="stats-cards"></div>
+        <h3 class="stats-h3">⏱️ Heures par sport</h3>
+        <div id="stats-sports"></div>
+        <h3 class="stats-h3">📅 Calendrier des séances</h3>
+        <div class="cal-nav">
+          <button class="btn ghost small" id="cal-prev" type="button">←</button>
+          <span id="cal-title"></span>
+          <button class="btn ghost small" id="cal-next" type="button">→</button>
+        </div>
+        <div id="cal-grid"></div>
+        <div id="cal-legend"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Modale : admin (TEMPORAIRE — pour tester les systèmes) -->
@@ -145,6 +171,10 @@
           <span>Durée :</span>
           <input type="range" id="duration-slider" min="5" max="180" step="5" value="30">
           <span class="duration-value"><span id="duration-value">30</span> min</span>
+        </div>
+        <div class="when-row">
+          <label>📅 <input type="date" id="session-date"></label>
+          <label>🕒 <input type="time" id="session-time"></label>
         </div>
         <div class="gain-preview" id="gain-preview"></div>
         <button class="btn" id="btn-confirm-activity" type="button" style="width:100%">Valider la séance ⛽</button>
@@ -294,6 +324,7 @@
   <script src="js/engine.js"></script>
   <script src="js/scene.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/stats.js"></script>
   <script src="js/worlddata.js"></script>
   <script src="js/map.js"></script>
   <script src="js/achievements.js"></script>
