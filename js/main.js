@@ -30,6 +30,7 @@ const Main = (() => {
     UI.refreshHUD();
 
     if (summary) UI.offlineSummary(summary);
+    UI.streakReminder();   // 🔥 rappel si la série est en sursis
 
     startLoop();
   }

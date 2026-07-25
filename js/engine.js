@@ -128,8 +128,15 @@ const Engine = (() => {
       tookOff = true;
     }
 
-    const litres = (act.fixed ? act.keroBonus : act.keroPerMin * minutes) *
+    // 🔥 Série de jours consécutifs : état AVANT et APRÈS cette séance
+    const before = Streak.current(player, ts).days;
+    const streakDays = Streak.forSession(player, ts, activityId);
+    const streakMult = Streak.multiplier(streakDays);
+
+    const base = (act.fixed ? act.keroBonus : act.keroPerMin * minutes) *
       State.keroYield(player);
+    const litres = base * streakMult;
+    const streakBonus = litres - base;   // litres dus à la série
     const cap = State.tankCapacity(player);
     const added = Math.min(litres, cap - player.kerosene);
     player.kerosene = Math.min(cap, player.kerosene + litres);
@@ -141,13 +148,25 @@ const Engine = (() => {
       kero: Math.round(added),
       date: ts,             // début de la séance
       loggedAt: Date.now(), // moment de l'enregistrement
+      streak: streakDays,   // série au moment de la séance 🔥
     });
     if (player.activityLog.length > 500) player.activityLog.shift();
     player.totalSportMinutes += minutes;
     player.totalSessions = (player.totalSessions || 0) + 1;
 
+    // Record de série (mémorisé : le journal est plafonné à 500 entrées)
+    const record = Streak.best(player);
+    if (record > (player.bestStreak || 0)) player.bestStreak = record;
+
     State.save();
-    return { litres: added, tookOff };
+    return {
+      litres: added, tookOff,
+      streak: streakDays,
+      streakMult,
+      streakBonus: Math.max(0, Math.round(streakBonus)),
+      streakUp: streakDays > before,   // un jour de plus dans la série
+      streakRecord: player.bestStreak > 0 && streakDays >= player.bestStreak,
+    };
   }
 
   // --- Achats boutique ---

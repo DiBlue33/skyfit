@@ -66,12 +66,19 @@ const Auth = (() => {
     const players = State.allPlayers().slice().sort((a, b) => record(b) - record(a));
     const medals = ['🥇', '🥈', '🥉'];
     $('home-scoreboard').innerHTML = players.length
-      ? players.map((p, i) => `
+      ? players.map((p, i) => {
+        const s = Streak.current(p);
+        const flame = s.alive
+          ? `<span class="hsr-streak ${s.pending ? 'pending' : ''}"
+               title="${s.days} jours d'affilée · ${Streak.fmtMult(s.mult)} kérosène">🔥 ${s.days}</span>`
+          : '';
+        return `
         <div class="home-score-row">
-          <span class="hsr-name">${medals[i] || '•'} ${escapeHtml(p.name)}${p.crashed ? ' 💥' : ''}</span>
+          <span class="hsr-name">${medals[i] || '•'} ${escapeHtml(p.name)}${p.crashed ? ' 💥' : ''}${flame}</span>
           <span class="hsr-km">🏆 ${fmt(record(p))} km
             <small>en vol : ${fmt(p.totalKm)} km</small></span>
-        </div>`).join('')
+        </div>`;
+      }).join('')
       : '<p class="home-empty">Aucun pilote pour l\'instant.<br>Connecte-toi pour créer ton profil !</p>';
   }
 

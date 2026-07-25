@@ -30,6 +30,7 @@ const State = (() => {
       totalSportMinutes: 0,
       totalSessions: 0,            // nombre total de séances (jamais tronqué)
       maxAltitude: CONFIG.ALT_START, // plus haute altitude atteinte
+      bestStreak: 0,               // plus longue série de jours consécutifs 🔥
       claimedAchievements: {},     // id de succès -> date de réclamation
     };
   }
@@ -93,6 +94,8 @@ const State = (() => {
       }
       if (typeof p.totalSessions !== 'number') p.totalSessions = p.activityLog.length;
       if (typeof p.maxAltitude !== 'number') p.maxAltitude = Math.max(p.altitude || 0, CONFIG.ALT_START);
+      // Séries de jours consécutifs (v2.1) — recalculées depuis le journal
+      if (typeof p.bestStreak !== 'number') p.bestStreak = 0;
     });
   }
 

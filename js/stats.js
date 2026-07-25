@@ -60,6 +60,56 @@ const Stats = (() => {
     });
   }
 
+  /* ---------- Série de jours consécutifs 🔥 ---------- */
+
+  function renderStreak() {
+    const p = State.current();
+    if (!p || !$('streak-panel')) return;
+
+    const s = Streak.current(p);
+    const record = Streak.best(p);
+    const maxDays = Streak.daysForMaxMult();
+    const active = Streak.activeDays(p);
+
+    // Bandeau des 14 derniers jours (aujourd'hui à droite)
+    const today = Streak.startOfDay(Date.now());
+    const dots = [];
+    let d = today;
+    for (let i = 0; i < 14; i++) {
+      const done = active.has(d);
+      const label = new Date(d).toLocaleDateString('fr-FR',
+        { weekday: 'short', day: 'numeric', month: 'short' });
+      dots.unshift(`<span class="sd-dot ${done ? 'on' : 'off'} ${d === today ? 'today' : ''}"
+        title="${label} — ${done ? 'séance enregistrée ✅' : 'pas de séance'}">${done ? '🔥' : ''}</span>`);
+      d = Streak.prevDay(d);
+    }
+
+    const nextMult = Streak.multiplier(s.days + 1);
+    const hint = s.mult >= CONFIG.STREAK.MAX_MULT
+      ? `🏅 Bonus maximal atteint : ${Streak.fmtMult(s.mult)} sur chaque séance !`
+      : s.alive
+        ? `Une séance de plus demain → ${Streak.fmtMult(nextMult)}` +
+          ` (maximum ${Streak.fmtMult(CONFIG.STREAK.MAX_MULT)} à ${maxDays} jours).`
+        : `Enregistre une séance aujourd'hui pour lancer une série :` +
+          ` +${Math.round(CONFIG.STREAK.BONUS_PER_DAY * 100)} % de kérosène par jour supplémentaire.`;
+
+    $('streak-panel').innerHTML = `
+      <div class="streak-hero ${s.alive ? (s.pending ? 'pending' : 'on') : 'off'}">
+        <div class="sh-flame">🔥</div>
+        <div class="sh-main">
+          <div class="sh-days"><span data-count="${s.days}">0</span>
+            <small>${s.days > 1 ? 'jours d\'affilée' : 'jour'}</small></div>
+          <div class="sh-sub">
+            Bonus kérosène <b>${Streak.fmtMult(s.mult)}</b>
+            · Record <b>${record} j</b>
+            ${s.pending ? '<span class="sh-warn">⚠️ à confirmer aujourd\'hui</span>' : ''}
+          </div>
+        </div>
+      </div>
+      <div class="streak-days">${dots.join('')}</div>
+      <p class="streak-hint">${hint}</p>`;
+  }
+
   /* ---------- Statistiques ---------- */
 
   function renderStats() {
@@ -263,6 +313,7 @@ const Stats = (() => {
     const now = new Date();
     calMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     hideDayDetail();
+    renderStreak();
     renderStats();
     renderCalendar();
     $('modal-stats').classList.add('open');

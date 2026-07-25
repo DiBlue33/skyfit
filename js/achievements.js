@@ -79,6 +79,25 @@ const Achievements = (() => {
       prog: (p) => [Math.min(p.totalSportMinutes || 0, n), n],
     }));
 
+    // --- Séries de jours consécutifs 🔥 ---
+    const STREAK_STEPS = [
+      [3, 75, '🔥', 'Mise en route'],
+      [7, 200, '🔥', 'Semaine parfaite'],
+      [14, 400, '🔥', 'Quinzaine en or'],
+      [30, 800, '🔥', 'Un mois sans faillir'],
+      [100, 2000, '🔥', 'Centurion'],
+    ];
+    STREAK_STEPS.forEach(([n, reward, icon, title]) => defs.push({
+      id: 'streak_' + n,
+      group: 'Séries',
+      icon,
+      name: `${title} — ${n} jours`,
+      desc: `Faire du sport ${n} jours consécutifs`,
+      reward,
+      test: (p) => Streak.best(p) >= n,
+      prog: (p) => [Math.min(Streak.best(p), n), n],
+    }));
+
     // --- Flotte : posséder chaque avion ---
     CONFIG.PLANES.filter(pl => pl.cost > 0).forEach(pl => defs.push({
       id: 'plane_' + pl.id,
@@ -203,7 +222,7 @@ const Achievements = (() => {
     const p = State.current();
     if (!p) return;
 
-    const groups = ['Voyages', 'Assiduité', 'Flotte', 'Décors', 'Divers'];
+    const groups = ['Voyages', 'Assiduité', 'Séries', 'Flotte', 'Décors', 'Divers'];
     const all = defs();
     const claimed = all.filter(d => status(p, d) === 'claimed').length;
     $('ach-summary').textContent =

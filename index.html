@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkyFit — Fais du sport, garde ton avion en vol !</title>
-  <link rel="stylesheet" href="css/style.css?v=20260716a">
+  <link rel="stylesheet" href="css/style.css?v=20260725a">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>✈️</text></svg>">
 </head>
 <body>
@@ -21,6 +21,7 @@
     <h3>⛽ Réserve de kérosène</h3>
     <div class="kero-value"><span id="kero-litres">0</span> L <small>/ <span id="kero-max">4000</span> L</small></div>
     <div class="kero-bar"><div class="kero-fill" id="kero-fill"></div></div>
+    <div id="streak-badge" title="Série de jours consécutifs avec au moins une séance"></div>
     <div id="current-player-badge">
       Pilote : <b id="player-name">—</b>
       <button id="btn-switch-player" type="button">déconnexion</button>
@@ -76,6 +77,7 @@
         <button class="modal-close" data-close="modal-stats" type="button">✕</button>
       </div>
       <div class="modal-body">
+        <div id="streak-panel"></div>
         <div id="stats-cards"></div>
         <h3 class="stats-h3">⏱️ Heures par sport</h3>
         <div id="stats-sports"></div>
@@ -320,19 +322,20 @@
   <!-- Toast -->
   <div id="toast"></div>
 
-  <script src="js/config.js?v=20260716a"></script>
-  <script src="js/state.js?v=20260716a"></script>
-  <script src="js/engine.js?v=20260716a"></script>
-  <script src="js/scene.js?v=20260716a"></script>
-  <script src="js/ui.js?v=20260716a"></script>
-  <script src="js/stats.js?v=20260716a"></script>
-  <script src="js/worlddata.js?v=20260716a"></script>
-  <script src="js/map.js?v=20260716a"></script>
-  <script src="js/achievements.js?v=20260716a"></script>
-  <script src="js/sync-config.js?v=20260716a"></script>
-  <script src="js/sync.js?v=20260716a"></script>
-  <script src="js/auth.js?v=20260716a"></script>
-  <script src="js/admin.js?v=20260716a"></script>
-  <script src="js/main.js?v=20260716a"></script>
+  <script src="js/config.js?v=20260725a"></script>
+  <script src="js/state.js?v=20260725a"></script>
+  <script src="js/streak.js?v=20260725a"></script>
+  <script src="js/engine.js?v=20260725a"></script>
+  <script src="js/scene.js?v=20260725a"></script>
+  <script src="js/ui.js?v=20260725a"></script>
+  <script src="js/stats.js?v=20260725a"></script>
+  <script src="js/worlddata.js?v=20260725a"></script>
+  <script src="js/map.js?v=20260725a"></script>
+  <script src="js/achievements.js?v=20260725a"></script>
+  <script src="js/sync-config.js?v=20260725a"></script>
+  <script src="js/sync.js?v=20260725a"></script>
+  <script src="js/auth.js?v=20260725a"></script>
+  <script src="js/admin.js?v=20260725a"></script>
+  <script src="js/main.js?v=20260725a"></script>
 </body>
 </html>

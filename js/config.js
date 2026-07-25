@@ -29,6 +29,14 @@ const CONFIG = {
   // --- Points ---
   KM_PER_POINT: 10,    // 10 km parcourus = 1 point
 
+  // --- Séries de jours consécutifs 🔥 (streaks) ---
+  // Chaque jour de suite avec au moins une séance de sport augmente
+  // le rendement en kérosène. Sauter un jour remet la série à zéro.
+  STREAK: {
+    BONUS_PER_DAY: 0.10, // +10 % par jour de série (jour 1 = ×1,0)
+    MAX_MULT: 2.0,       // plafond : ×2 (atteint au 11e jour)
+  },
+
   // --- Activités sportives (litres de kérosène par minute) ---
   // Rendements calés sur l'intensité de l'effort
   ACTIVITIES: [

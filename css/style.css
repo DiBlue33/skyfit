@@ -1174,6 +1174,188 @@ button {
   text-decoration: underline;
 }
 
+/* ---------- Séries de jours consécutifs 🔥 ---------- */
+
+/* Pastille du HUD (sous la jauge de kérosène) */
+#streak-badge {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px 6px;
+  margin-top: 8px;
+  padding: 5px 9px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: #a8500f;
+  background: linear-gradient(120deg, rgba(243, 156, 18, 0.18), rgba(246, 195, 68, 0.10));
+  border: 1px solid rgba(243, 156, 18, 0.38);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+#streak-badge .sb-flame { font-size: 1rem; filter: saturate(1.2); }
+#streak-badge .sb-text { white-space: nowrap; }
+#streak-badge .sb-text b { font-size: 0.95rem; font-weight: 800; }
+
+/* Libellés longs sur grand écran, abrégés sur téléphone */
+#streak-badge .sb-short { display: none; }
+
+#streak-badge .sb-mult {
+  margin-left: auto;
+  font-weight: 800;
+  color: var(--accent-warm);
+  white-space: nowrap;
+}
+
+#streak-badge .sb-warn {
+  flex-basis: 100%;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--danger);
+}
+
+#streak-badge.at-risk {
+  border-color: rgba(231, 76, 60, 0.45);
+  background: linear-gradient(120deg, rgba(231, 76, 60, 0.14), rgba(243, 156, 18, 0.08));
+}
+
+#streak-badge.off {
+  color: var(--text-soft);
+  background: rgba(30, 50, 70, 0.06);
+  border-color: var(--panel-border);
+  font-size: 0.72rem;
+}
+#streak-badge.off .sb-flame { filter: grayscale(1); opacity: 0.55; }
+
+#streak-badge.maxed {
+  border-color: rgba(231, 76, 60, 0.55);
+  background: linear-gradient(120deg, rgba(231, 76, 60, 0.2), rgba(243, 156, 18, 0.16));
+}
+#streak-badge.maxed .sb-flame { animation: flame-idle 1.8s ease-in-out infinite; }
+
+@keyframes flame-idle {
+  0%, 100% { transform: scale(1) rotate(-2deg); }
+  50% { transform: scale(1.15) rotate(2deg); }
+}
+
+/* Animation quand la série gagne un jour */
+#streak-badge.pop { animation: streak-pop 1.1s cubic-bezier(0.34, 1.4, 0.64, 1); }
+
+@keyframes streak-pop {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.12); box-shadow: 0 0 0 0 rgba(243, 156, 18, 0.55); }
+  100% { transform: scale(1); box-shadow: 0 0 0 18px rgba(243, 156, 18, 0); }
+}
+
+/* Flammes dans les classements */
+.score-streak,
+.hsr-streak {
+  margin-left: 5px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--accent-warm);
+  white-space: nowrap;
+}
+.score-streak.pending,
+.hsr-streak.pending { opacity: 0.6; }
+
+/* Chip dans le journal des activités */
+.j-streak {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #a8500f;
+  background: rgba(243, 156, 18, 0.18);
+}
+
+/* Panneau des statistiques */
+#streak-panel { margin-bottom: 12px; }
+
+.streak-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(243, 156, 18, 0.35);
+  background: linear-gradient(135deg, rgba(243, 156, 18, 0.16), rgba(246, 195, 68, 0.06));
+  animation: card-in 0.45s ease backwards;
+}
+
+.streak-hero.off {
+  border-color: var(--panel-border);
+  background: rgba(30, 50, 70, 0.05);
+}
+.streak-hero.pending { border-color: rgba(231, 76, 60, 0.4); }
+
+.streak-hero .sh-flame { font-size: 2.4rem; line-height: 1; }
+.streak-hero.on .sh-flame { animation: flame-idle 2.2s ease-in-out infinite; }
+.streak-hero.off .sh-flame { filter: grayscale(1); opacity: 0.5; }
+
+.streak-hero .sh-days {
+  font-size: 1.9rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--accent-warm);
+}
+.streak-hero .sh-days small {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-left: 6px;
+}
+
+.streak-hero .sh-sub {
+  margin-top: 5px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+.streak-hero .sh-sub b { color: var(--text); }
+.streak-hero .sh-warn {
+  display: block;
+  margin-top: 3px;
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* Bandeau des 14 derniers jours */
+.streak-days {
+  display: flex;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.streak-days .sd-dot {
+  flex: 1;
+  aspect-ratio: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  border-radius: 7px;
+  border: 1px solid var(--panel-border);
+  background: rgba(30, 50, 70, 0.05);
+}
+
+.streak-days .sd-dot.on {
+  background: linear-gradient(140deg, rgba(243, 156, 18, 0.28), rgba(246, 195, 68, 0.14));
+  border-color: rgba(243, 156, 18, 0.45);
+}
+
+.streak-days .sd-dot.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.streak-hint {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+.gp-streak { color: var(--accent-warm); font-weight: 700; }
+
 /* ---------- Responsive (téléphones) ---------- */
 
 @media (max-width: 640px) {
@@ -1190,6 +1372,32 @@ button {
   .kero-bar { height: 10px; }
   #current-player-badge { font-size: 0.68rem; margin-top: 4px; }
   #current-player-badge button { font-size: 0.68rem; }
+
+  /* Série 🔥 compacte */
+  #streak-badge {
+    margin-top: 5px;
+    padding: 4px 7px;
+    font-size: 0.66rem;
+    gap: 2px 4px;
+  }
+  #streak-badge .sb-flame { font-size: 0.82rem; }
+  #streak-badge .sb-text b { font-size: 0.8rem; }
+  #streak-badge .sb-mult { font-size: 0.66rem; margin-left: auto; }
+  #streak-badge .sb-warn { font-size: 0.6rem; }
+  #streak-badge.off { font-size: 0.62rem; }
+  /* Sur téléphone : « 5 j » au lieu de « 5 jours d'affilée » */
+  #streak-badge .sb-long { display: none; }
+  #streak-badge .sb-short { display: inline; }
+  .score-streak, .hsr-streak { font-size: 0.64rem; margin-left: 3px; }
+
+  .streak-hero { padding: 11px 12px; gap: 10px; }
+  .streak-hero .sh-flame { font-size: 1.9rem; }
+  .streak-hero .sh-days { font-size: 1.5rem; }
+  .streak-hero .sh-days small { font-size: 0.72rem; }
+  .streak-hero .sh-sub { font-size: 0.72rem; }
+  .streak-days { gap: 3px; }
+  .streak-days .sd-dot { font-size: 0.62rem; border-radius: 5px; }
+  .streak-hint { font-size: 0.72rem; }
 
   #hud-stats {
     top: 8px; right: 8px;

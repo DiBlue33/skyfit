@@ -24,6 +24,9 @@ const UI = (() => {
     $('kero-fill').style.width = Math.min(100, (p.kerosene / cap) * 100) + '%';
     $('player-name').textContent = p.name;
 
+    // Série de jours consécutifs 🔥
+    refreshStreakBadge(p);
+
     // Distance & points
     $('total-km').textContent = fmt(p.totalKm);
     $('points').textContent = fmt(State.availablePoints(p));
@@ -70,6 +73,61 @@ const UI = (() => {
     lastAlt = p.altitude;
   }
 
+  /* ---------- Série 🔥 ---------- */
+
+  /** Pastille de série dans le HUD kérosène. */
+  function refreshStreakBadge(p) {
+    const el = $('streak-badge');
+    if (!el) return;
+    const s = Streak.current(p);
+
+    el.classList.toggle('off', !s.alive);
+    el.classList.toggle('at-risk', !!s.pending);
+    el.classList.toggle('maxed', s.mult >= CONFIG.STREAK.MAX_MULT);
+
+    if (!s.alive) {
+      el.innerHTML = `<span class="sb-flame">🔥</span>
+        <span class="sb-text"><span class="sb-long">Aucune série — lance-la aujourd'hui !</span>` +
+        `<span class="sb-short">Lance ta série !</span></span>`;
+      el.title = 'Fais une séance chaque jour : ta série augmente le kérosène gagné.';
+      return;
+    }
+    const j = s.days > 1 ? 'jours' : 'jour';
+    el.innerHTML = `<span class="sb-flame">🔥</span>
+      <span class="sb-text"><b>${s.days}</b>&nbsp;<span class="sb-long">${j} d'affilée</span><span class="sb-short">j</span></span>
+      <span class="sb-mult">${Streak.fmtMult(s.mult)} ⛽</span>` +
+      (s.pending
+        ? '<span class="sb-warn"><span class="sb-long">à confirmer aujourd\'hui !</span>' +
+          '<span class="sb-short">à confirmer !</span></span>'
+        : '');
+    el.title = s.pending
+      ? `Série de ${s.days} ${j} : enregistre une séance avant minuit pour ne pas la perdre !`
+      : `Série de ${s.days} ${j} : +${Math.round((s.mult - 1) * 100)} % de kérosène sur chaque séance.`;
+  }
+
+  /** Rappel à la connexion : série en sursis ou perdue. */
+  function streakReminder() {
+    const p = State.current();
+    if (!p) return;
+    const s = Streak.current(p);
+    if (s.pending && s.days >= 2) {
+      setTimeout(() => toast(
+        `🔥 Ta série de <b>${s.days} jours</b> tient encore ! ` +
+        `Enregistre une séance avant minuit pour la prolonger (${Streak.fmtMult(s.mult)} de kérosène).`,
+        7000), 2600);
+    }
+  }
+
+  /** Petite animation quand la série gagne un jour. */
+  function streakPop() {
+    const el = $('streak-badge');
+    if (!el) return;
+    el.classList.remove('pop');
+    void el.offsetWidth;         // relance l'animation
+    el.classList.add('pop');
+    setTimeout(() => el.classList.remove('pop'), 1200);
+  }
+
   // Classement général : trié par record (meilleure tentative)
   function refreshScoreboard() {
     const me = State.current();
@@ -78,12 +136,18 @@ const UI = (() => {
       .slice()
       .sort((a, b) => record(b) - record(a));
     const medals = ['🥇', '🥈', '🥉'];
-    $('scoreboard').innerHTML = players.map((p, i) => `
+    $('scoreboard').innerHTML = players.map((p, i) => {
+      const s = Streak.current(p);
+      const flame = s.alive
+        ? `<span class="score-streak ${s.pending ? 'pending' : ''}"
+             title="${s.days} jours d'affilée">🔥${s.days}</span>` : '';
+      return `
       <div class="score-row ${p.name === me.name ? 'me' : ''}">
-        <span><span class="medal">${medals[i] || '•'}</span>${escapeHtml(p.name)}${p.crashed ? ' 💥' : ''}</span>
+        <span><span class="medal">${medals[i] || '•'}</span>${escapeHtml(p.name)}${p.crashed ? ' 💥' : ''}${flame}</span>
         <span>${fmt(p.totalKm)} km
           <span class="score-record">🏆 ${fmt(record(p))}</span></span>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }
 
   function escapeHtml(s) {
@@ -135,28 +199,40 @@ const UI = (() => {
     const p = State.current();
     const act = CONFIG.ACTIVITIES.find(a => a.id === selectedActivity);
 
+    // Série 🔥 telle qu'elle sera APRÈS cette séance (bonus inclus)
+    const when = sessionWhen();
+    const streakDays = Streak.forSession(p, when, act.id);
+    const streakMult = Streak.multiplier(streakDays);
+    const streakLine = streakDays > 1
+      ? `<br><small class="gp-streak">🔥 Série de ${streakDays} jours : ` +
+        `bonus ${Streak.fmtMult(streakMult)} déjà compté` +
+        (streakMult >= CONFIG.STREAK.MAX_MULT ? ' (bonus maximal !)' : '') + '</small>'
+      : '';
+
     // Bonus fixe (créatine) : pas de durée
     $('duration-row').style.display = act.fixed ? 'none' : '';
     if (act.fixed) {
-      const litres = Math.round(act.keroBonus * State.keroYield(p));
+      const litres = Math.round(act.keroBonus * State.keroYield(p) * streakMult);
       $('gain-preview').innerHTML =
         `💊 La dose du jour : <b>+${fmt(litres)} L</b> de kérosène` +
-        (act.oncePerDay ? ' <small>(une prise par jour)</small>' : '') + '.';
+        (act.oncePerDay ? ' <small>(une prise par jour)</small>' : '') + '.' +
+        streakLine;
       return;
     }
 
     const minutes = parseInt($('duration-slider').value, 10);
     $('duration-value').textContent = minutes;
-    const litres = Math.round(act.keroPerMin * minutes * State.keroYield(p));
+    const litres = Math.round(act.keroPerMin * minutes * State.keroYield(p) * streakMult);
     const climb = Math.round(litres * CONFIG.CLIMB_FT_PER_LITRE);
     // Heure de fin déduite du début + durée
-    const start = new Date(sessionWhen());
+    const start = new Date(when);
     const end = new Date(start.getTime() + minutes * 60000);
     const hm = (d) => d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     $('gain-preview').innerHTML =
       `⛽ Cette séance rapportera <b>${fmt(litres)} L</b> de kérosène,` +
       ` soit jusqu'à <b>+${fmt(climb)} ft</b> d'altitude.` +
-      `<br><small>🕒 De ${hm(start)} à ${hm(end)}</small>`;
+      `<br><small>🕒 De ${hm(start)} à ${hm(end)}</small>` +
+      streakLine;
   }
 
   function confirmActivity() {
@@ -187,6 +263,22 @@ const UI = (() => {
     }
     keroseneRain(btnRect, act.fixed ? 5 : Math.min(16, 6 + Math.round(minutes / 15)));
     refreshHUD();
+
+    // 🔥 La série vient de grandir : message dédié + animation de la pastille
+    if (res.streakUp && res.streak > 1) {
+      streakPop();
+      setTimeout(() => {
+        const maxed = res.streakMult >= CONFIG.STREAK.MAX_MULT;
+        const extra = res.streakBonus > 0
+          ? ` (+${fmt(res.streakBonus)} L de bonus)` : '';
+        toast(
+          `🔥 Série de ${res.streak} jours d'affilée !${extra} ` +
+          (maxed
+            ? `Bonus kérosène au maximum : ${Streak.fmtMult(res.streakMult)} 🏅`
+            : `Rendement kérosène : ${Streak.fmtMult(res.streakMult)}. Ne la casse pas !`),
+          5200);
+      }, 1400);
+    }
   }
 
   /**
@@ -283,11 +375,14 @@ const UI = (() => {
       const detail = e.minutes > 0
         ? `${escapeHtml(act.name)}, ${e.minutes} min`
         : escapeHtml(act.name);
+      // Série au moment de la séance (enregistrée depuis la v2.1)
+      const streakChip = (!isAch && e.streak > 1)
+        ? `<span class="j-streak" title="${e.streak}e jour d'affilée">🔥${e.streak}</span>` : '';
       html += `
         <div class="journal-row ${mine ? 'me' : ''}">
           <span class="j-time">${time}</span>
           <span class="j-icon">${iconHtml}</span>
-          <span class="j-text"><b>${escapeHtml(e.player)}</b> — ${detail}</span>
+          <span class="j-text"><b>${escapeHtml(e.player)}</b> — ${detail}${streakChip}</span>
           <span class="j-gain">+${fmt(e.kero)} L ⛽</span>
         </div>`;
     }
@@ -447,5 +542,5 @@ const UI = (() => {
     $('btn-switch-player').addEventListener('click', () => Auth.logout());
   }
 
-  return { bind, refreshHUD, toast, offlineSummary, keroseneRain };
+  return { bind, refreshHUD, toast, offlineSummary, keroseneRain, streakReminder };
 })();
