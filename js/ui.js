@@ -85,6 +85,7 @@ const UI = (() => {
 
     refreshScoreboard();
     Achievements.updateBadge();
+    Wheel.refreshButton();     // 🎡 pastille « tour disponible » + compte à rebours
     lastAlt = p.altitude;
   }
 
@@ -423,10 +424,14 @@ const UI = (() => {
       }
       const isAch = e.activityId === 'achievement';
       const isDisco = e.activityId === 'discovery';
+      const isWheel = e.activityId === 'wheel';
+      const isMeta = isAch || isDisco || isWheel;
       const act = isAch
         ? { icon: e.achIcon || '🏆', name: `Succès « ${e.achName || '?'} »` }
         : isDisco
         ? { icon: e.cityIcon || '🛬', name: `Première visite : ${e.city || '?'}` }
+        : isWheel
+        ? { icon: e.prizeIcon || '🎡', name: `Roue de la chance — ${e.prizeLabel || '?'}` }
         : CONFIG.ACTIVITIES.find(a => a.id === e.activityId) ||
           (CONFIG.LEGACY_ACTIVITIES || {})[e.activityId] ||
           { icon: '💪', name: e.activityId };
@@ -440,14 +445,18 @@ const UI = (() => {
         ? `${escapeHtml(act.name)}, ${e.minutes} min`
         : escapeHtml(act.name);
       // Série au moment de la séance (enregistrée depuis la v2.1)
-      const streakChip = (!isAch && !isDisco && e.streak > 1)
+      const streakChip = (!isMeta && e.streak > 1)
         ? `<span class="j-streak" title="${e.streak}e jour d'affilée">🔥${e.streak}</span>` : '';
+      // Gains : litres, et points quand l'entrée en rapporte (roue 🎡)
+      const gains = [];
+      if (e.kero > 0 || !e.pts) gains.push(`+${fmt(e.kero)} L ⛽`);
+      if (e.pts > 0) gains.push(`+${fmt(e.pts)} ★`);
       html += `
         <div class="journal-row ${mine ? 'me' : ''}">
           <span class="j-time">${time}</span>
           <span class="j-icon">${iconHtml}</span>
           <span class="j-text"><b>${escapeHtml(e.player)}</b> — ${detail}${streakChip}</span>
-          <span class="j-gain">+${fmt(e.kero)} L ⛽</span>
+          <span class="j-gain">${gains.join('<br>')}</span>
         </div>`;
     }
     $('journal-body').innerHTML = html;
@@ -717,6 +726,8 @@ const UI = (() => {
       refreshJournal();
       openModal('modal-journal');
     });
+
+    $('btn-wheel').addEventListener('click', () => Wheel.open());
     document.querySelectorAll('.shop-tab').forEach(tab =>
       tab.addEventListener('click', () => { shopTab = tab.dataset.tab; refreshShop(); }));
 

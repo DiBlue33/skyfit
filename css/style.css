@@ -1920,3 +1920,143 @@ button {
   .wx-table thead th:last-child { display: none; }
   .wx-hm-cell { height: 14px; }
 }
+
+/* ============================================================
+   Roue de la chance 🎡 (v2.7)
+   ============================================================ */
+
+/* Bouton du HUD : pastille verte quand le tour du jour est libre */
+#btn-wheel { position: relative; font-size: 1.05rem; line-height: 1; }
+#btn-wheel.ready {
+  border-color: rgba(46, 204, 113, 0.85);
+  box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.25);
+}
+#btn-wheel.ready { animation: wheel-nudge 2.8s ease-in-out infinite; }
+.wheel-dot {
+  position: absolute;
+  top: -4px; right: -4px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #2ecc71;
+  border: 2px solid #14293c;
+  display: none;
+}
+#btn-wheel.ready .wheel-dot { display: block; }
+
+@keyframes wheel-nudge {
+  0%, 88%, 100% { transform: rotate(0deg); }
+  92%  { transform: rotate(-9deg); }
+  96%  { transform: rotate(9deg); }
+}
+
+.modal-wheel { width: min(460px, calc(100vw - 24px)); }
+
+.wheel-intro {
+  margin: 2px 0 10px;
+  font-size: 0.86rem;
+  color: var(--text-soft);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.wheel-stage {
+  position: relative;
+  width: min(330px, 78vw);
+  margin: 0 auto;
+  aspect-ratio: 1 / 1;
+}
+
+.wheel-svg {
+  width: 100%; height: 100%;
+  filter: drop-shadow(0 10px 24px rgba(10, 30, 50, 0.35));
+}
+
+#wheel-rotor { transform-origin: 100px 100px; }
+
+.wheel-seg-icon,
+.wheel-seg-label {
+  text-anchor: middle;
+  fill: #fff;
+  font-family: inherit;
+  paint-order: stroke;
+  stroke: rgba(10, 25, 40, 0.45);
+  stroke-width: 0.7;
+}
+.wheel-seg-icon { font-size: 13px; }
+.wheel-seg-label { font-size: 8.5px; font-weight: 700; }
+.wheel-hub { text-anchor: middle; font-size: 15px; }
+
+.wheel-pointer {
+  position: absolute;
+  top: -12px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.6rem;
+  color: #fff;
+  text-shadow: 0 3px 6px rgba(10, 30, 50, 0.6);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.wheel-result {
+  min-height: 46px;
+  margin: 8px 0 2px;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.wheel-result.show { opacity: 1; transform: none; }
+.wheel-result .wr-title { font-size: 1.15rem; font-weight: 800; }
+.wheel-result .wr-gain { font-size: 0.95rem; color: var(--text-soft); margin-top: 2px; }
+.wheel-result .wr-warn { font-size: 0.78rem; color: var(--danger); margin-top: 4px; }
+.wheel-result.jackpot .wr-title {
+  color: #f1c40f;
+  animation: wheel-jackpot 0.9s ease infinite alternate;
+}
+@keyframes wheel-jackpot {
+  from { text-shadow: 0 0 0 rgba(241, 196, 15, 0); transform: scale(1); }
+  to   { text-shadow: 0 0 18px rgba(241, 196, 15, 0.85); transform: scale(1.06); }
+}
+
+.wheel-go { width: 100%; margin-top: 6px; padding: 13px 12px; font-size: 0.98rem; }
+.wheel-go:disabled { opacity: 0.65; cursor: default; }
+
+.wheel-stats {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.wheel-odds { margin-top: 10px; font-size: 0.8rem; }
+.wheel-odds summary { cursor: pointer; color: var(--text-soft); }
+.wheel-odds ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.wheel-odds li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 7px;
+}
+.wheel-odds li:nth-child(odd) { background: rgba(255, 255, 255, 0.05); }
+
+/* Pulsation des points (gain de la roue) */
+.points-value.pts-pulse { animation: pts-pulse 0.6s ease; }
+@keyframes pts-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.14); color: #f1c40f; }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #btn-wheel.ready { animation: none; }
+  .wheel-result.jackpot .wr-title { animation: none; }
+}
+
+@media (max-width: 640px) {
+  /* La barre du bas gagne un bouton : l'altimètre reste au-dessus */
+  #btn-wheel { padding: 12px 9px; }
+  .wheel-stage { width: min(300px, 82vw); }
+  .wheel-intro { font-size: 0.8rem; }
+  .wheel-seg-label { font-size: 9px; }
+}

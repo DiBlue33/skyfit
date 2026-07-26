@@ -60,6 +60,7 @@ const Main = (() => {
 
     if (summary) UI.offlineSummary(summary);
     UI.streakReminder();   // 🔥 rappel si la série est en sursis
+    Wheel.reminder();      // 🎡 rappel si le tour du jour est disponible
 
     startLoop();
   }

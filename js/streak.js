@@ -32,7 +32,8 @@ const Streak = (() => {
 
   /** Une activité entretient-elle la série ? (sport uniquement) */
   function counts(activityId) {
-    if (activityId === 'achievement') return false;
+    // Événements de jeu (succès, escale, roue) : ce n'est pas du sport
+    if ((CONFIG.META_ENTRIES || {})[activityId]) return false;
     const act = CONFIG.ACTIVITIES.find(a => a.id === activityId);
     if (act && act.fixed) return false;   // créatine & futurs bonus fixes
     return true;                          // sports actuels + anciens (legacy)

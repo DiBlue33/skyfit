@@ -77,6 +77,39 @@ const CONFIG = {
     autre:     { icon: '💪', name: 'Autre sport' },
   },
 
+  // Entrées du journal qui ne sont PAS des séances : événements de jeu
+  // (succès réclamé, escale découverte, roue de la chance). Elles
+  // n'entretiennent pas la série 🔥 et ne comptent pas dans les
+  // statistiques sportives — sinon on « ferait du sport » en atterrissant.
+  META_ENTRIES: {
+    achievement: { icon: '🏆', name: 'Succès réclamé' },
+    discovery:   { icon: '🛬', name: 'Escale découverte' },
+    wheel:       { icon: '🎡', name: 'Roue de la chance' },
+  },
+
+  // --- Roue de la chance 🎡 ---
+  // Un tour par jour calendaire (remise à zéro à minuit).
+  // La somme des poids fait 100 : chaque poids EST le pourcentage de chance.
+  // Équilibrage : espérance ≈ 214 L et ≈ 206 points par jour, soit environ
+  // deux tiers d'une séance de 30 min de running. La roue récompense la
+  // présence quotidienne sans jamais remplacer le sport — et le jackpot
+  // (3 %) tombe en moyenne une fois par mois.
+  WHEEL: {
+    SPIN_MS: 5200,          // durée de l'animation de rotation
+    TURNS: 6,               // tours complets avant de ralentir
+    PRIZES: [
+      { id: 'kero_s',  icon: '⛽', label: '150 L',   kero: 150,  points: 0,    weight: 22, color: '#f5b041' },
+      { id: 'pts_m',   icon: '★',  label: '250 pts', kero: 0,    points: 250,  weight: 14, color: '#2e86de' },
+      { id: 'kero_l',  icon: '⛽', label: '600 L',   kero: 600,  points: 0,    weight: 10, color: '#d35400' },
+      { id: 'pts_s',   icon: '★',  label: '100 pts', kero: 0,    points: 100,  weight: 20, color: '#5dade2' },
+      { id: 'jackpot', icon: '💎', label: 'JACKPOT', kero: 1500, points: 2500, weight: 3,  color: '#f1c40f',
+        jackpot: true },
+      { id: 'kero_m',  icon: '⛽', label: '300 L',   kero: 300,  points: 0,    weight: 16, color: '#e67e22' },
+      { id: 'pts_l',   icon: '★',  label: '600 pts', kero: 0,    points: 600,  weight: 8,  color: '#1b6ca8' },
+      { id: 'combo',   icon: '🎁', label: '400 L + 400 pts', kero: 400, points: 400, weight: 7, color: '#8e44ad' },
+    ],
+  },
+
   // --- Boutique : avions ---
   // cruise  : vitesse de croisière réelle (km/h vraie, atteinte au plafond)
   // ceiling : plafond opérationnel réel (ft)

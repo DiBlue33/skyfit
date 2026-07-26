@@ -26,15 +26,19 @@ const Stats = (() => {
     return FALLBACK_COLORS[Math.max(0, idx) % FALLBACK_COLORS.length];
   }
 
-  // Séances de sport uniquement (ni succès, ni bonus nutrition)
+  // Événement de jeu (succès réclamé, escale, roue) plutôt que séance ?
+  const isMeta = (id) => !!(CONFIG.META_ENTRIES || {})[id];
+
+  // Séances de sport uniquement (ni événement de jeu, ni bonus nutrition)
   function sportSessions(p) {
     return (p.activityLog || []).filter(e =>
-      e.activityId !== 'achievement' && e.activityId !== 'creatine');
+      !isMeta(e.activityId) && e.activityId !== 'creatine');
   }
 
   function actInfo(id) {
     return CONFIG.ACTIVITIES.find(a => a.id === id) ||
       (CONFIG.LEGACY_ACTIVITIES || {})[id] ||
+      (CONFIG.META_ENTRIES || {})[id] ||
       { icon: '💪', name: id };
   }
 
@@ -184,7 +188,7 @@ const Stats = (() => {
     State.allPlayers().forEach(p => {
       const color = playerColor(p.name);
       (p.activityLog || []).forEach(e => {
-        if (e.activityId === 'achievement') return;
+        if (isMeta(e.activityId)) return;   // succès, escale, roue : pas des séances
         const d = new Date(e.date);
         const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
         (map[key] = map[key] || []).push({

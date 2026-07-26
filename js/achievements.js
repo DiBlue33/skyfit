@@ -154,6 +154,40 @@ const Achievements = (() => {
       test: (p) => (p.ownedDecors || []).includes(d.id),
     }));
 
+    // --- Chance : roue quotidienne 🎡 ---
+    defs.push(
+      {
+        id: 'wheel_first', group: 'Chance', icon: '🎡',
+        name: 'Premier tour',
+        desc: 'Lancer la roue de la chance',
+        reward: 50,
+        test: (p) => (p.wheelSpins || 0) >= 1,
+      },
+      {
+        id: 'wheel_10', group: 'Chance', icon: '🎡',
+        name: 'Habitué de la roue',
+        desc: 'Lancer la roue 10 fois',
+        reward: 150,
+        test: (p) => (p.wheelSpins || 0) >= 10,
+        prog: (p) => [Math.min(p.wheelSpins || 0, 10), 10],
+      },
+      {
+        id: 'wheel_50', group: 'Chance', icon: '🍀',
+        name: 'Fidèle au poste',
+        desc: 'Lancer la roue 50 fois',
+        reward: 500,
+        test: (p) => (p.wheelSpins || 0) >= 50,
+        prog: (p) => [Math.min(p.wheelSpins || 0, 50), 50],
+      },
+      {
+        id: 'wheel_jackpot', group: 'Chance', icon: '💎',
+        name: 'Jackpot !',
+        desc: 'Décrocher la case JACKPOT (3 % de chance par tour)',
+        reward: 750,
+        test: (p) => (p.wheelJackpots || 0) >= 1,
+      },
+    );
+
     // --- Divers ---
     defs.push(
       {
@@ -268,7 +302,7 @@ const Achievements = (() => {
     if (!p) return;
 
     const groups = VOYAGE_GROUPS.concat(
-      ['Réseau', 'Assiduité', 'Séries', 'Flotte', 'Décors', 'Divers']);
+      ['Réseau', 'Assiduité', 'Séries', 'Flotte', 'Décors', 'Chance', 'Divers']);
     const all = defs();
     const claimed = all.filter(d => status(p, d) === 'claimed').length;
     $('ach-summary').textContent =

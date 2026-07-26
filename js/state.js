@@ -40,6 +40,10 @@ const State = (() => {
       totalSessions: 0,            // nombre total de séances (jamais tronqué)
       maxAltitude: CONFIG.startAltFor({ currentPlane: 'cessna' }), // plus haute altitude atteinte
       bestStreak: 0,               // plus longue série de jours consécutifs 🔥
+      // Roue de la chance 🎡 (v2.7) — champs plats : Firebase les conserve
+      wheelLast: 0,                // horodatage du dernier tour (0 = jamais)
+      wheelSpins: 0,               // nombre total de tours joués
+      wheelJackpots: 0,            // nombre de jackpots décrochés
       claimedAchievements: {},     // id de succès -> date de réclamation
     };
   }
@@ -106,6 +110,10 @@ const State = (() => {
       if (typeof p.maxAltitude !== 'number') p.maxAltitude = Math.max(p.altitude || 0, CONFIG.startAltFor(p));
       // Séries de jours consécutifs (v2.1) — recalculées depuis le journal
       if (typeof p.bestStreak !== 'number') p.bestStreak = 0;
+      // Roue de la chance (v2.7)
+      if (typeof p.wheelLast !== 'number') p.wheelLast = 0;
+      if (typeof p.wheelSpins !== 'number') p.wheelSpins = 0;
+      if (typeof p.wheelJackpots !== 'number') p.wheelJackpots = 0;
       // Réseau de routes (v2.3)
       migrateRoutes(p, routeIds);
       // Plafond propre à chaque avion (v2.6) : un profil qui volait au-dessus
