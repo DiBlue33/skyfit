@@ -257,12 +257,14 @@ const WorldMap = (() => {
   /**
    * Position affichée : entre deux ticks du moteur (1 s) on extrapole
    * le déplacement pour que l'avion glisse au lieu de sauter.
-   * Réservé au pilote local : l'horodatage des autres vient du cloud.
+   * Vaut pour TOUS les pilotes : depuis la v2.5, les autres profils sont
+   * eux aussi simulés en local à chaque seconde (Engine.simulateOthers),
+   * leur `lastTick` est donc frais et l'extrapolation légitime.
    */
-  function displayedLegKm(p, isMe) {
+  function displayedLegKm(p) {
     const len = Routes.active(p).km || 1;
     let km = typeof p.legKm === 'number' ? p.legKm : 0;
-    if (isMe && !p.crashed) {
+    if (!p.crashed) {
       const dt = (Date.now() - (p.lastTick || 0)) / 1000;
       if (dt > 0 && dt < 5) {
         const kmh = CONFIG.speedForAlt(p.altitude) * State.speedMult(p);
@@ -278,7 +280,7 @@ const WorldMap = (() => {
     const players = State.allPlayers().slice().sort((a, b) => b.totalKm - a.totalKm);
     markers = players.map((p, i) => {
       const isMe = !!me && p.name === me.name;
-      const g = Routes.geoAt(Routes.active(p).id, displayedLegKm(p, isMe), p.legDir);
+      const g = Routes.geoAt(Routes.active(p).id, displayedLegKm(p), p.legDir);
       return {
         name: p.name, color: playerColor(p.name, i), me: isMe,
         km: p.totalKm, crashed: !!p.crashed, altitude: p.altitude,

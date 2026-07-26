@@ -233,6 +233,9 @@ const Weather = (() => {
   /** Composantes u/v pour un point, une altitude et une heure. */
   function uvAtPoint(pt, altFt, hi) {
     if (!pt) return null;
+    // Relevé incomplet (cache partiel, réponse tronquée) → pas de vent,
+    // surtout pas d'exception : ce code tourne à chaque tick du moteur.
+    if (!Array.isArray(pt.u) || !Array.isArray(pt.v)) return null;
     // Encadrement en altitude
     let lo = 0, hi2 = LEVELS.length - 1;
     if (altFt <= LEVELS[0].ft) { lo = hi2 = 0; }

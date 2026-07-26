@@ -165,7 +165,98 @@ const Engine = (() => {
     if (player.totalKm > player.bestKm) player.bestKm = player.totalKm;
     player.totalKm = 0;   // le score recommence à zéro
     Routes.resetToBase(player);   // on repart de LFPG, route conservée
-    State.save();
+    // En mode fantôme, on n'estampille jamais le profil de l'autre pilote :
+    // sa version réelle doit rester prioritaire à la fusion.
+    if (ghost) State.save(null, true);
+    else State.save();
+  }
+
+  /* ============================================================
+     👥 Pilotes « fantômes » — les AUTRES profils continuent de voler
+     ------------------------------------------------------------
+     Sans cela, l'avion de l'autre pilote reste figé tant qu'il n'a pas
+     ouvert son profil : il fallait se connecter à son compte pour le
+     voir avancer. On rejoue donc ici, en local, exactement la même
+     simulation pour tous les autres profils.
+
+     Règle d'or : c'est une PRÉDICTION d'affichage.
+       • `updatedAt` n'est jamais touché → rien n'est publié dans le
+         cloud (`pushNewer` ne pousse que du plus récent), donc la
+         version réelle de l'appareil de l'autre pilote gagne toujours
+         à la fusion et corrige la prédiction.
+       • Le cumul est mémorisé (`ghostLog`) pour que le pilote retrouve
+         son résumé « pendant ton absence » à sa prochaine connexion.
+     ============================================================ */
+
+  let ghost = false;            // vrai pendant la simulation d'un autre profil
+  let lastGhostSave = 0;        // sauvegarde locale throttlée
+  const ghostLog = {};          // nom -> cumul non encore consulté
+
+  function blankGhost() {
+    return { seconds: 0, km: 0, altDelta: 0, crashed: false,
+             windKm: 0, windSum: 0, route: noRouteEvents() };
+  }
+
+  function noteGhost(name, seconds, res) {
+    const g = ghostLog[name] || (ghostLog[name] = blankGhost());
+    g.seconds += seconds;
+    g.km += res.km;
+    g.altDelta += res.altDelta;
+    g.crashed = g.crashed || res.crashed;
+    g.windKm += res.km;
+    g.windSum += res.wind * res.km;
+    g.route.baseTouches += res.route.baseTouches;
+    if (res.route.switched) g.route.switched = res.route.switched;
+    g.route.arrivals.push(...res.route.arrivals);
+    g.route.firstVisits.push(...res.route.firstVisits);
+    // Bornes de sécurité : ce cumul vit en mémoire tant que le pilote
+    // ne se connecte pas sur cet appareil.
+    if (g.route.arrivals.length > 60) g.route.arrivals.splice(0, g.route.arrivals.length - 60);
+    if (g.route.firstVisits.length > 30) g.route.firstVisits.splice(0, g.route.firstVisits.length - 30);
+  }
+
+  /** Récupère (et vide) le cumul fantôme d'un pilote qui se connecte. */
+  function takeGhost(name) {
+    const g = ghostLog[name];
+    if (!g) return null;
+    delete ghostLog[name];
+    g.wind = g.windKm > 0 ? g.windSum / g.windKm : 0;
+    return g;
+  }
+
+  /**
+   * Fait avancer tous les profils SAUF celui passé en paramètre.
+   * @param exceptName pilote déjà simulé par la boucle de jeu (ou null)
+   * @returns [{ name, km, altDelta, crashed, route }] pour les pilotes ayant bougé
+   */
+  function simulateOthers(exceptName) {
+    const now = Date.now();
+    const capS = CONFIG.MAX_OFFLINE_DAYS * 86400;
+    const moved = [];
+    ghost = true;
+    try {
+      State.allPlayers().forEach(p => {
+        if (!p || !p.name || p.name === exceptName) return;
+        let elapsedS = (now - (p.lastTick || now)) / 1000;
+        if (!isFinite(elapsedS) || elapsedS <= 0) return;   // horloge en arrière
+        if (elapsedS < 0.25) return;                        // rien de neuf
+        if (elapsedS > capS) elapsedS = capS;
+        const res = simulate(p, elapsedS);
+        noteGhost(p.name, elapsedS, res);
+        moved.push({ name: p.name, km: res.km, altDelta: res.altDelta,
+                     crashed: res.crashed, route: res.route });
+      });
+    } finally {
+      ghost = false;
+    }
+    // Sauvegarde locale SANS estampiller : la prédiction ne part pas au cloud.
+    // Throttlée à 10 s — si l'onglet se ferme entre-temps rien n'est perdu :
+    // le `lastTick` resté en arrière fera simplement le rattrapage au retour.
+    if (moved.length && now - lastGhostSave > 10000) {
+      lastGhostSave = now;
+      State.save(null, true);
+    }
+    return moved;
   }
 
   /**
@@ -179,12 +270,27 @@ const Engine = (() => {
     const capS = CONFIG.MAX_OFFLINE_DAYS * 86400;
     if (elapsedS > capS) elapsedS = capS;
 
-    const summaryWorthy = elapsedS >= 120;
     const res = simulate(player, elapsedS);
 
-    return summaryWorthy
-      ? { seconds: elapsedS, km: res.km, altDelta: res.altDelta,
-          crashed: res.crashed, wind: res.wind, route: res.route }
+    // Ce pilote a peut-être déjà volé « en fantôme » pendant qu'un autre
+    // profil était en jeu sur cet appareil : on recolle les deux morceaux
+    // pour qu'il retrouve un résumé complet.
+    const g = takeGhost(player.name);
+    const seconds  = elapsedS + (g ? g.seconds : 0);
+    const km       = res.km + (g ? g.km : 0);
+    const altDelta = res.altDelta + (g ? g.altDelta : 0);
+    const windKm   = res.km + (g ? g.windKm : 0);
+    const windSum  = res.wind * res.km + (g ? g.windSum : 0);
+    const route    = g ? {
+      arrivals:    g.route.arrivals.concat(res.route.arrivals),
+      firstVisits: g.route.firstVisits.concat(res.route.firstVisits),
+      baseTouches: g.route.baseTouches + res.route.baseTouches,
+      switched:    res.route.switched || g.route.switched,
+    } : res.route;
+
+    return seconds >= 120
+      ? { seconds, km, altDelta, crashed: res.crashed || (g ? g.crashed : false),
+          wind: windKm > 0 ? windSum / windKm : 0, route }
       : null;
   }
 
@@ -366,7 +472,8 @@ const Engine = (() => {
   }
 
   return {
-    simulate, catchUp, logActivity, upgradeCost, buyPlane, buyDecor, buyUpgrade,
+    simulate, catchUp, simulateOthers, logActivity, upgradeCost,
+    buyPlane, buyDecor, buyUpgrade,
     buyRoute, setRoute, cancelPendingRoute, etaToBase, arrivalBonus,
   };
 })();

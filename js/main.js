@@ -5,6 +5,7 @@
 const Main = (() => {
 
   let tickInterval = null;
+  let worldInterval = null;
 
   function init() {
     State.load();
@@ -12,9 +13,36 @@ const Main = (() => {
     Scene.init();
     UI.bind();
     Sync.startLoop();
+    startWorldLoop();   // 👥 les autres pilotes volent aussi sur cet appareil
 
     // Toujours passer par l'écran d'accueil (connexion par code PIN)
     Auth.showHome();
+  }
+
+  /** Vrai si une partie est en cours (l'accueil est refermé). */
+  function isPlaying() {
+    const home = document.getElementById('home-screen');
+    return !!home && !home.classList.contains('open');
+  }
+
+  /**
+   * 👥 Boucle « monde » : fait avancer les avions des AUTRES pilotes en
+   * temps réel, sans attendre qu'ils ouvrent leur profil. Tourne aussi
+   * depuis l'écran d'accueil pour que le classement général reste vivant.
+   * La prédiction n'est jamais publiée (cf. Engine.simulateOthers).
+   */
+  function startWorldLoop() {
+    if (worldInterval) return;
+    worldInterval = setInterval(worldTick, CONFIG.TICK_MS);
+  }
+
+  function worldTick() {
+    const playing = isPlaying();
+    const me = playing ? State.current() : null;
+    const moved = Engine.simulateOthers(me ? me.name : null);
+    if (!moved.length) return;
+    if (playing) UI.refreshScoreboard();   // le HUD est déjà rafraîchi par la boucle de jeu
+    else Auth.refreshHome();
   }
 
   function startWithPlayer(name) {

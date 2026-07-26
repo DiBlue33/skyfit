@@ -197,7 +197,7 @@ const UI = (() => {
         ? `<span class="score-streak ${s.pending ? 'pending' : ''}"
              title="${s.days} jours d'affilée">🔥${s.days}</span>` : '';
       return `
-      <div class="score-row ${p.name === me.name ? 'me' : ''}">
+      <div class="score-row ${me && p.name === me.name ? 'me' : ''}">
         <span><span class="medal">${medals[i] || '•'}</span>${escapeHtml(p.name)}${p.crashed ? ' 💥' : ''}${flame}</span>
         <span>${fmt(p.totalKm)} km
           <span class="score-record">🏆 ${fmt(record(p))}</span></span>
@@ -721,6 +721,6 @@ const UI = (() => {
     $('btn-switch-player').addEventListener('click', () => Auth.logout());
   }
 
-  return { bind, refreshHUD, refreshShop, toast, offlineSummary, keroseneRain,
-           streakReminder, flightEvents };
+  return { bind, refreshHUD, refreshShop, refreshScoreboard, toast,
+           offlineSummary, keroseneRain, streakReminder, flightEvents };
 })();
