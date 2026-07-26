@@ -164,11 +164,22 @@ const Achievements = (() => {
         test: (p) => (p.crashes || 0) >= 1,
       },
       {
+        // Chaque avion a son propre plafond depuis la v2.6 : ce succès reste
+        // volontairement une altitude ABSOLUE, donc réservé aux jets.
         id: 'ceiling', group: 'Divers', icon: '🚀',
         name: 'Plafond du monde',
-        desc: `Atteindre l'altitude maximale : ${fmt(CONFIG.ALT_MAX)} ft`,
+        desc: `Atteindre ${fmt(CONFIG.ALT_REF)} ft — il faut un vrai jet`,
         reward: 200,
-        test: (p) => (p.maxAltitude || 0) >= CONFIG.ALT_MAX - 1,
+        test: (p) => (p.maxAltitude || 0) >= CONFIG.ALT_REF - 1,
+        prog: (p) => [Math.min(p.maxAltitude || 0, CONFIG.ALT_REF), CONFIG.ALT_REF],
+      },
+      {
+        id: 'stratosphere', group: 'Divers', icon: '🛰️',
+        name: 'Stratosphère',
+        desc: 'Atteindre 55 000 ft — seul le Concorde en est capable',
+        reward: 500,
+        test: (p) => (p.maxAltitude || 0) >= 55000,
+        prog: (p) => [Math.min(p.maxAltitude || 0, 55000), 55000],
       },
       {
         id: 'record_50k', group: 'Divers', icon: '🏆',
@@ -321,5 +332,6 @@ const Achievements = (() => {
 
   document.addEventListener('DOMContentLoaded', bind);
 
-  return { open, claim, claimableCount, updateBadge };
+  // `_defs` : point d'entrée pour les suites de tests uniquement.
+  return { open, claim, claimableCount, updateBadge, _defs: defs };
 })();

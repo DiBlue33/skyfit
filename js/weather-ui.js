@@ -148,10 +148,16 @@ const WeatherUI = (() => {
 
     /* --- Vent par altitude, maintenant --- */
     const grid = Weather.forecastGrid(p, CONFIG.WEATHER.HOURS_AHEAD);
-    const rows = grid.rows.map(row => {
+    // Les paliers dépendent du plafond de l'avion : le repère « vous êtes ici »
+    // se cale donc sur le palier le plus proche, pas sur un écart fixe.
+    let nearest = 0;
+    grid.rows.forEach((row, i) => {
+      if (Math.abs(row.ft - p.altitude) < Math.abs(grid.rows[nearest].ft - p.altitude)) nearest = i;
+    });
+    const rows = grid.rows.map((row, i) => {
       const c0 = row.cells[0];
       const kk = kind(c0.tail, c0.speed);
-      const here = Math.abs(row.ft - p.altitude) < 2600;
+      const here = i === nearest;
       return `<tr class="${here ? 'current' : ''}">
         <th>${fmt(row.ft)} ft</th>
         <td class="wx-arrow"><span class="wb-arrow" style="--rot:${((c0.dirFrom + 180) % 360).toFixed(0)}deg">➤</span></td>

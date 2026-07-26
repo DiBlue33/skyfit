@@ -70,7 +70,7 @@ const Admin = (() => {
 
       case 'alt-apply':
         p.altitude = Math.max(CONFIG.ALT_MIN,
-          Math.min(CONFIG.ALT_MAX, parseInt($('admin-alt-slider').value, 10)));
+          Math.min(CONFIG.ceilingFor(p), parseInt($('admin-alt-slider').value, 10)));
         UI.toast(`🔧 Altitude réglée à ${fmt(p.altitude)} ft`);
         break;
 
@@ -123,7 +123,7 @@ const Admin = (() => {
         // Repart de zéro en conservant le nom
         Object.assign(p, {
           lastTick: Date.now(),
-          altitude: CONFIG.ALT_START,
+          altitude: CONFIG.startAltFor({ currentPlane: 'cessna' }),
           kerosene: 200,
           crashed: false, crashes: 0,
           totalKm: 0, bestKm: 0, lifetimeKm: 0,
@@ -132,7 +132,7 @@ const Admin = (() => {
           ownedDecors: ['day'], currentDecor: 'day',
           upgrades: { yield: 0, aero: 0, tank: 0 },
           activityLog: [], totalSportMinutes: 0,
-          totalSessions: 0, maxAltitude: CONFIG.ALT_START,
+          totalSessions: 0, maxAltitude: CONFIG.startAltFor({ currentPlane: 'cessna' }),
           claimedAchievements: {},
         });
         Scene.setPlane(p.currentPlane);

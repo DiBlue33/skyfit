@@ -8,23 +8,31 @@
 
 const CONFIG = {
   // --- Altitude (en pieds) ---
+  // Chaque avion a désormais SON plafond opérationnel réel (voir PLANES).
+  // ALT_REF est l'altitude de référence historique : toute l'économie
+  // d'altitude (montée, décroissance, altitude de départ) est exprimée en
+  // proportion du plafond puis remise à l'échelle sur cette référence, afin
+  // que la dynamique reste rigoureusement identique d'un avion à l'autre.
   ALT_MIN: 0,             // plancher : à 0 ft, c'est le CRASH 💥
-  ALT_START: 5000,        // altitude après un décollage
-  ALT_MAX: 38000,         // plafond
+  ALT_REF: 38000,         // référence d'équilibrage (ancien plafond unique)
+  ALT_START_RATIO: 0.13,  // altitude de décollage = 13 % du plafond
 
   // --- Perte d'altitude ---
-  DECAY_FT_PER_HOUR: 500, // perte de base par heure (s'applique en continu)
+  // 500 ft/h sur 38 000 ft de plafond ⇒ 76 h de vol plané avant le crash.
+  // Mise à l'échelle du plafond : ce délai est le même pour tous les avions.
+  DECAY_FT_PER_HOUR: 500, // perte de base par heure, à ALT_REF
 
   // --- Kérosène ---
   // L'avion brûle automatiquement son kérosène pour monter.
   BURN_RATE_L_PER_HOUR: 600,  // litres brûlés par heure quand la réserve > 0
-  CLIMB_FT_PER_LITRE: 40,     // pieds gagnés par litre brûlé
+  CLIMB_FT_PER_LITRE: 40,     // pieds gagnés par litre brûlé, à ALT_REF
   KERO_TANK_MAX: 4000,        // capacité max de la réserve (litres)
 
-  // --- Vitesse (km/h) en fonction de l'altitude ---
-  // (0 km/h en cas de crash, géré par le moteur)
-  SPEED_AT_MIN: 150,   // vitesse au ras du sol (0 ft)
-  SPEED_AT_MAX: 950,   // vitesse à 38 000 ft
+  // --- Vitesse (km/h) ---
+  // Modèle réaliste : chaque avion a sa vraie vitesse de croisière, atteinte
+  // à son plafond. Plus bas, il vole à une fraction de cette croisière —
+  // d'où l'intérêt de monter. (0 km/h en cas de crash, géré par le moteur.)
+  CRUISE_FLOOR_RATIO: 0.35,   // part de la croisière conservée au ras du sol
 
   // --- Points ---
   KM_PER_POINT: 10,    // 10 km parcourus = 1 point
@@ -69,30 +77,34 @@ const CONFIG = {
     autre:     { icon: '💪', name: 'Autre sport' },
   },
 
-  // --- Boutique : avions (multiplicateur de vitesse) ---
-  // width : largeur d'affichage à l'écran (en vw, bornée en px)
+  // --- Boutique : avions ---
+  // cruise  : vitesse de croisière réelle (km/h vraie, atteinte au plafond)
+  // ceiling : plafond opérationnel réel (ft)
+  // width   : largeur d'affichage à l'écran (en vw, bornée en px)
+  // Les valeurs restent dans l'enveloppe de vol réelle de chaque appareil,
+  // choisies en haut de fourchette pour que la boutique reste croissante.
   PLANES: [
-    { id: 'cessna',    name: 'Cessna 172',        cost: 0,      speedMult: 1.0,  width: 13,
+    { id: 'cessna',    name: 'Cessna 172',        cost: 0,      cruise: 226,  ceiling: 14000, width: 13,
       desc: "L'avion-école des premiers décollages.",
       prop: { left: 94.22, top: 14.18, width: 5.78, height: 67.38 } },
-    { id: 'tbm700',    name: 'TBM 700',           cost: 500,    speedMult: 1.15, width: 14,
-      desc: 'Turbopropulseur rapide. +15 % de vitesse.',
+    { id: 'tbm700',    name: 'TBM 700',           cost: 500,    cruise: 555,  ceiling: 31000, width: 14,
+      desc: 'Turbopropulseur pressurisé, deux fois plus rapide que le Cessna.',
       // Hélice animée : position/taille de l'overlay en % du sprite
       prop: { left: 90.96, top: 37.91, width: 9.3, height: 62.75 } },
-    { id: 'a220',      name: 'Airbus A220',       cost: 2000,   speedMult: 1.35, width: 19,
-      desc: 'Moyen-courrier moderne. +35 % de vitesse.' },
-    { id: 'b737',      name: 'Boeing 737',        cost: 6000,   speedMult: 1.55, width: 20,
-      desc: 'Le best-seller du ciel. +55 % de vitesse.' },
-    { id: 'a320',      name: 'Airbus A320',       cost: 15000,  speedMult: 1.75, width: 21,
-      desc: 'Ligne majeure. +75 % de vitesse.' },
-    { id: 'a330',      name: 'Airbus A330',       cost: 25000,  speedMult: 1.85, width: 23,
-      desc: 'Long-courrier élégant. +85 % de vitesse.' },
-    { id: 'falcon900', name: 'Falcon 900',        cost: 35000,  speedMult: 2.0,  width: 17,
-      desc: 'Jet présidentiel. Vitesse x2.' },
-    { id: 'a380',      name: 'Airbus A380',       cost: 80000,  speedMult: 2.2,  width: 25,
-      desc: 'Le géant des airs. Vitesse x2,2.' },
-    { id: 'concorde',  name: 'Concorde',          cost: 180000, speedMult: 2.6,  width: 26,
-      desc: 'Supersonique mythique. Vitesse x2,6.' },
+    { id: 'a220',      name: 'Airbus A220',       cost: 2000,   cruise: 828,  ceiling: 41000, width: 19,
+      desc: 'Le premier vrai jet du parc : la haute altitude s\'ouvre enfin.' },
+    { id: 'b737',      name: 'Boeing 737',        cost: 6000,   cruise: 842,  ceiling: 41000, width: 20,
+      desc: 'Le best-seller du ciel, valeur sûre du moyen-courrier.' },
+    { id: 'a320',      name: 'Airbus A320',       cost: 15000,  cruise: 850,  ceiling: 39800, width: 21,
+      desc: 'La ligne majeure européenne, un cran au-dessus du 737.' },
+    { id: 'a330',      name: 'Airbus A330',       cost: 25000,  cruise: 880,  ceiling: 41100, width: 23,
+      desc: 'Long-courrier élégant, taillé pour les traversées.' },
+    { id: 'falcon900', name: 'Falcon 900',        cost: 40000,  cruise: 900,  ceiling: 51000, width: 17,
+      desc: 'Jet d\'affaires : le plus haut plafond du parc, hors Concorde.' },
+    { id: 'a380',      name: 'Airbus A380',       cost: 80000,  cruise: 920,  ceiling: 43000, width: 25,
+      desc: 'Le géant des airs, et la croisière subsonique la plus rapide.' },
+    { id: 'concorde',  name: 'Concorde',          cost: 180000, cruise: 2150, ceiling: 60000, width: 26,
+      desc: 'Supersonique mythique. Mach 2, hors catégorie.' },
   ],
 
   // --- Boutique : améliorations à niveaux ---
@@ -130,8 +142,50 @@ const CONFIG = {
   SAVE_KEY: 'skyfit_save_v1',
 };
 
-// Vitesse (km/h) pour une altitude donnée, hors multiplicateur d'avion
-CONFIG.speedForAlt = function (altFt) {
-  const t = (altFt - CONFIG.ALT_MIN) / (CONFIG.ALT_MAX - CONFIG.ALT_MIN);
-  return CONFIG.SPEED_AT_MIN + t * (CONFIG.SPEED_AT_MAX - CONFIG.SPEED_AT_MIN);
+/* ------------------------------------------------------------
+   Modèle de vol : tout part de l'avion piloté
+   ------------------------------------------------------------ */
+
+/** Fiche de l'avion, avec repli sur le Cessna si l'id est inconnu. */
+CONFIG.planeById = function (id) {
+  return CONFIG.PLANES.find(pl => pl.id === id) || CONFIG.PLANES[0];
+};
+
+/** Fiche de l'avion actuellement piloté par ce joueur. */
+CONFIG.planeOf = function (player) {
+  return CONFIG.planeById(player && player.currentPlane);
+};
+
+/** Plafond opérationnel (ft) de l'avion piloté. */
+CONFIG.ceilingFor = function (player) {
+  return CONFIG.planeOf(player).ceiling;
+};
+
+/**
+ * Vitesse air (km/h) à une altitude donnée pour un avion donné.
+ * Au plafond → 100 % de la croisière ; au sol → CRUISE_FLOOR_RATIO.
+ * `plane` peut être une fiche d'avion ou directement un joueur.
+ */
+CONFIG.speedAt = function (altFt, planeOrPlayer) {
+  const plane = planeOrPlayer && planeOrPlayer.cruise
+    ? planeOrPlayer
+    : CONFIG.planeOf(planeOrPlayer);
+  const t = Math.max(0, Math.min(1, altFt / plane.ceiling));
+  const floor = CONFIG.CRUISE_FLOOR_RATIO;
+  return plane.cruise * (floor + (1 - floor) * t);
+};
+
+/** Perte d'altitude de base (ft/h), proportionnelle au plafond. */
+CONFIG.decayFtPerHour = function (player) {
+  return CONFIG.DECAY_FT_PER_HOUR * CONFIG.ceilingFor(player) / CONFIG.ALT_REF;
+};
+
+/** Gain d'altitude par litre brûlé (ft/L), proportionnel au plafond. */
+CONFIG.climbFtPerLitre = function (player) {
+  return CONFIG.CLIMB_FT_PER_LITRE * CONFIG.ceilingFor(player) / CONFIG.ALT_REF;
+};
+
+/** Altitude de remise en vol après un crash (ft), arrondie à la centaine. */
+CONFIG.startAltFor = function (player) {
+  return Math.round(CONFIG.ceilingFor(player) * CONFIG.ALT_START_RATIO / 100) * 100;
 };

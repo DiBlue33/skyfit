@@ -100,14 +100,17 @@ const Scene = (() => {
    * @param altFt altitude actuelle
    * @param speedKmh vitesse actuelle
    */
-  function update(altFt, speedKmh) {
-    // Position verticale : ALT_MIN => bas de l'écran, ALT_MAX => haut
-    const t = (altFt - CONFIG.ALT_MIN) / (CONFIG.ALT_MAX - CONFIG.ALT_MIN);
+  function update(altFt, speedKmh, ceilingFt) {
+    // Position verticale : ALT_MIN => bas de l'écran, plafond de l'avion => haut
+    const ceiling = ceilingFt || CONFIG.ALT_REF;
+    const t = Math.max(0, Math.min(1, (altFt - CONFIG.ALT_MIN) / (ceiling - CONFIG.ALT_MIN)));
     const topPct = 72 - t * 55; // de 72 % (bas) à 17 % (haut)
     plane.style.top = topPct + '%';
 
     // Vitesse des nuages : plus on va vite, plus le défilement est rapide
-    const speedFactor = Math.max(0.35, speedKmh / 500);
+    // Défilement des nuages calé sur la croisière de référence du parc, pour
+    // qu'un Cessna à 226 km/h reste visiblement plus lent qu'un A380.
+    const speedFactor = Math.max(0.30, Math.min(3.5, speedKmh / 500));
     skyEl.style.setProperty('--speed-factor', speedFactor.toFixed(2));
   }
 

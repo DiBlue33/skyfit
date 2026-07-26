@@ -357,7 +357,7 @@ const Weather = (() => {
 
   /** Vent + effet, prêt pour l'affichage (badge HUD). */
   function summaryFor(player) {
-    const airspeed = CONFIG.speedForAlt(player.altitude) * State.speedMult(player);
+    const airspeed = State.airspeed(player);
     const geo = Routes.geo(player);
     const w = windAt(geo, player.altitude, Date.now());
     const ratio = w.ok ? ratioFor(w.tail, airspeed) : 0;
@@ -406,15 +406,24 @@ const Weather = (() => {
    */
   function forecastGrid(player, hoursAhead) {
     const H = hoursAhead || 48;
-    const alts = [5000, 10000, 15000, 20000, 25000, 30000, 34000, 38000];
-    const mult = State.speedMult(player);
+    const plane = CONFIG.planeOf(player);
+    // Paliers d'altitude propres à l'AVION PILOTÉ (v2.6) : de l'altitude de
+    // décollage à son plafond. Conseiller 38 000 ft au pilote d'un Cessna
+    // n'aurait aucun sens — et au-dessus du plafond, la vitesse plafonne,
+    // ce qui rendait le classement du meilleur créneau arbitraire.
+    const lo = CONFIG.ALT_START_RATIO, n = 8;
+    const alts = [];
+    for (let i = 0; i < n; i++) {
+      const frac = lo + (1 - lo) * (i / (n - 1));
+      alts.push(Math.round(plane.ceiling * frac / 500) * 500);
+    }
     // Heure pleine courante (UTC local du navigateur)
     const start = new Date(); start.setMinutes(0, 0, 0);
     const t0 = start.getTime();
     const geo = Routes.geo(player);
 
     const rows = alts.map(ft => {
-      const airspeed = CONFIG.speedForAlt(ft) * mult;
+      const airspeed = CONFIG.speedAt(ft, plane);
       const cells = [];
       for (let h = 0; h < H; h++) {
         const w = windAt(geo, ft, t0 + h * 3600000);
@@ -425,7 +434,7 @@ const Weather = (() => {
       return { ft, airspeed, cells };
     });
 
-    return { t0, hours: H, alts, rows, ok: !!data };
+    return { t0, hours: H, alts, rows, ceiling: plane.ceiling, ok: !!data };
   }
 
   /**

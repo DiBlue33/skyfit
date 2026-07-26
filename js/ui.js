@@ -33,7 +33,10 @@ const UI = (() => {
     $('points').textContent = fmt(State.availablePoints(p));
 
     // Altimètre
-    const t = (p.altitude - CONFIG.ALT_MIN) / (CONFIG.ALT_MAX - CONFIG.ALT_MIN);
+    // La jauge se lit en pourcentage du plafond de l'avion piloté : un Cessna
+    // « plein pot » à 14 000 ft affiche donc le même cadran plein qu'un A380.
+    const ceiling = State.ceiling(p);
+    const t = (p.altitude - CONFIG.ALT_MIN) / (ceiling - CONFIG.ALT_MIN);
     const circ = 351.86;
     $('alt-progress').style.strokeDashoffset = circ * (1 - t);
     $('alt-progress').style.stroke =
@@ -53,7 +56,7 @@ const UI = (() => {
     }
 
     // Vitesse affichée = vitesse SOL, vent compris (0 si l'avion est au sol)
-    const airspeed = p.crashed ? 0 : CONFIG.speedForAlt(p.altitude) * State.speedMult(p);
+    const airspeed = p.crashed ? 0 : State.airspeed(p);
     const speed = p.crashed ? 0 : airspeed * Weather.factorFor(Routes.geo(p), p.altitude, Date.now(), airspeed);
     $('speed-value').textContent = fmt(speed);
 
@@ -68,7 +71,7 @@ const UI = (() => {
     }
 
     // Scène (un avion qui a déjà crashé reste marqué à vie)
-    Scene.update(p.altitude, speed);
+    Scene.update(p.altitude, speed, ceiling);
     Scene.setCondition(p.crashed, (p.crashes || 0) > 0);
 
     // Panneau CRASH
@@ -77,7 +80,7 @@ const UI = (() => {
     if (p.crashed) {
       $('crash-record').innerHTML = p.bestKm > 0
         ? `🏆 Ton record à battre : <b>${fmt(p.bestKm)} km</b> (crash n°${p.crashes})`
-        : `Fais une séance de sport pour repartir à ${fmt(CONFIG.ALT_START)} ft !`;
+        : `Fais une séance de sport pour repartir à ${fmt(CONFIG.startAltFor(p))} ft !`;
     }
 
     refreshScoreboard();
@@ -281,7 +284,7 @@ const UI = (() => {
     const minutes = parseInt($('duration-slider').value, 10);
     $('duration-value').textContent = minutes;
     const litres = Math.round(act.keroPerMin * minutes * State.keroYield(p) * streakMult);
-    const climb = Math.round(litres * CONFIG.CLIMB_FT_PER_LITRE);
+    const climb = Math.round(litres * CONFIG.climbFtPerLitre(State.current()));
     // Heure de fin déduite du début + durée
     const start = new Date(when);
     const end = new Date(start.getTime() + minutes * 60000);
@@ -313,7 +316,7 @@ const UI = (() => {
       : `${minutes} min de ${act.name.toLowerCase()}`;
     if (res.tookOff) {
       toast(`🛫 REDÉCOLLAGE ! ${doneTxt} : +${fmt(res.litres)} L. ` +
-        `Nouvelle tentative depuis ${fmt(CONFIG.ALT_START)} ft — bats ton record !`, 6000);
+        `Nouvelle tentative depuis ${fmt(CONFIG.startAltFor(State.current()))} ft — bats ton record !`, 6000);
     } else if (act.fixed) {
       toast(`${act.icon} ${doneTxt} : +${fmt(res.litres)} L de kérosène. Bonus du jour ! ▲`);
     } else {
@@ -468,7 +471,21 @@ const UI = (() => {
         if (current) btn = `<button class="btn small ghost" disabled type="button">En vol ✓</button>`;
         else if (owned) btn = `<button class="btn small" data-buy-plane="${plane.id}" type="button">Piloter</button>`;
         else btn = `<button class="btn small warm" data-buy-plane="${plane.id}" ${canBuy ? '' : 'disabled'} type="button">★ ${fmt(plane.cost)}</button>`;
-        return shopItem(plane.name, plane.desc, current ? 'owned-current' : '', btn);
+        // Fiche technique : croisière et plafond réels, plus l'écart de vitesse
+        // par rapport à l'appareil actuellement piloté.
+        const mine = CONFIG.planeOf(p);
+        let delta = '';
+        if (!current) {
+          const pct = Math.round((plane.cruise / mine.cruise - 1) * 100);
+          if (pct !== 0) {
+            delta = `<span class="plane-delta ${pct > 0 ? 'up' : 'down'}">` +
+                    `${pct > 0 ? '+' : ''}${pct} % vs ${mine.name}</span>`;
+          }
+        }
+        const specs = `<div class="plane-specs">` +
+          `<span>🛫 ${fmt(plane.cruise)} km/h</span>` +
+          `<span>⛰️ ${fmt(plane.ceiling)} ft</span>${delta}</div>`;
+        return shopItem(plane.name, plane.desc + specs, current ? 'owned-current' : '', btn);
       }).join('');
     } else if (shopTab === 'upgrades') {
       html = CONFIG.UPGRADES.map(up => {

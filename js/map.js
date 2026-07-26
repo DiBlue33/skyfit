@@ -270,7 +270,7 @@ const WorldMap = (() => {
    * lui-même ne rafraîchit son facteur que tous les 150 km.
    */
   function groundKmh(p) {
-    const air = CONFIG.speedForAlt(p.altitude) * State.speedMult(p);
+    const air = State.airspeed(p);
     let f = 1;
     try {
       f = Weather.factorFor(Routes.geo(p), p.altitude, Date.now(), air);

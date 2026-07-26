@@ -9,7 +9,7 @@ const State = (() => {
       name: name,
       createdAt: Date.now(),
       lastTick: Date.now(),        // dernier instant simulé
-      altitude: CONFIG.ALT_START,  // ft
+      altitude: CONFIG.startAltFor({ currentPlane: 'cessna' }), // ft
       kerosene: 200,               // petit plein de bienvenue (L)
       crashed: false,
       crashes: 0,                  // nombre de crashs subis
@@ -38,7 +38,7 @@ const State = (() => {
       activityLog: [],             // { activityId, minutes, kero, date }
       totalSportMinutes: 0,
       totalSessions: 0,            // nombre total de séances (jamais tronqué)
-      maxAltitude: CONFIG.ALT_START, // plus haute altitude atteinte
+      maxAltitude: CONFIG.startAltFor({ currentPlane: 'cessna' }), // plus haute altitude atteinte
       bestStreak: 0,               // plus longue série de jours consécutifs 🔥
       claimedAchievements: {},     // id de succès -> date de réclamation
     };
@@ -103,11 +103,15 @@ const State = (() => {
         p.claimedAchievements = {};
       }
       if (typeof p.totalSessions !== 'number') p.totalSessions = p.activityLog.length;
-      if (typeof p.maxAltitude !== 'number') p.maxAltitude = Math.max(p.altitude || 0, CONFIG.ALT_START);
+      if (typeof p.maxAltitude !== 'number') p.maxAltitude = Math.max(p.altitude || 0, CONFIG.startAltFor(p));
       // Séries de jours consécutifs (v2.1) — recalculées depuis le journal
       if (typeof p.bestStreak !== 'number') p.bestStreak = 0;
       // Réseau de routes (v2.3)
       migrateRoutes(p, routeIds);
+      // Plafond propre à chaque avion (v2.6) : un profil qui volait au-dessus
+      // du plafond réel de son appareil est ramené à ce plafond, une fois.
+      const ceil = CONFIG.ceilingFor(p);
+      if (typeof p.altitude === 'number' && p.altitude > ceil) p.altitude = ceil;
     });
   }
 
@@ -247,14 +251,18 @@ const State = (() => {
     return Math.max(0.3, 1 - (p.upgrades.aero || 0) * up.effectPerLevel);
   }
 
-  // Multiplicateur de vitesse de l'avion possédé
-  function speedMult(p) {
-    const plane = CONFIG.PLANES.find(pl => pl.id === p.currentPlane);
-    return plane ? plane.speedMult : 1;
+  // Vitesse air (km/h) : croisière de l'avion piloté, atténuée sous son plafond
+  function airspeed(p) {
+    return CONFIG.speedAt(p.altitude, p);
+  }
+
+  // Plafond opérationnel (ft) de l'avion piloté
+  function ceiling(p) {
+    return CONFIG.ceilingFor(p);
   }
 
   return {
     load, save, raw, migrate, addPlayer, selectPlayer, current, allPlayers,
-    playerNames, availablePoints, tankCapacity, keroYield, decayFactor, speedMult,
+    playerNames, availablePoints, tankCapacity, keroYield, decayFactor, airspeed, ceiling,
   };
 })();

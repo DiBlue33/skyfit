@@ -26,9 +26,13 @@ const Engine = (() => {
     let kmGained = 0;
     let justCrashed = false;
 
-    const decayPerS = (CONFIG.DECAY_FT_PER_HOUR * State.decayFactor(player)) / 3600;
+    // Plafond, montée et décroissance dépendent de l'avion piloté : tout est
+    // proportionnel au plafond, donc le temps de chute reste le même pour tous.
+    const plane     = CONFIG.planeOf(player);
+    const ceiling   = plane.ceiling;
+    const decayPerS = (CONFIG.decayFtPerHour(player) * State.decayFactor(player)) / 3600;
+    const climbPerL = CONFIG.climbFtPerLitre(player);
     const burnPerS  = CONFIG.BURN_RATE_L_PER_HOUR / 3600;   // L/s
-    const mult      = State.speedMult(player);
 
     // 🌬️ Vent : la composante dans l'axe du vol modifie la vitesse sol.
     // Recalculé par paliers (temps / distance / altitude) pour rester rapide
@@ -51,12 +55,12 @@ const Engine = (() => {
       if (player.kerosene > 0) {
         const burned = Math.min(player.kerosene, burnPerS * dt);
         player.kerosene -= burned;
-        player.altitude += burned * CONFIG.CLIMB_FT_PER_LITRE;
+        player.altitude += burned * climbPerL;
       }
 
       // 2) Descente naturelle (toujours active)
       player.altitude -= decayPerS * dt;
-      if (player.altitude > CONFIG.ALT_MAX) player.altitude = CONFIG.ALT_MAX;
+      if (player.altitude > ceiling) player.altitude = ceiling;
       if (player.altitude > (player.maxAltitude || 0)) player.maxAltitude = player.altitude;
 
       // 3) CRASH : altitude tombée à 0
@@ -67,7 +71,7 @@ const Engine = (() => {
       }
 
       // 4) Distance parcourue pendant ce pas (vitesse air puis vitesse sol)
-      const airspeed = CONFIG.speedForAlt(player.altitude) * mult;
+      const airspeed = CONFIG.speedAt(player.altitude, plane);
 
       if (windOn) {
         const kmNow = player.totalKm + kmGained;
@@ -319,7 +323,7 @@ const Engine = (() => {
     let tookOff = false;
     if (player.crashed) {
       player.crashed = false;
-      player.altitude = CONFIG.ALT_START;
+      player.altitude = CONFIG.startAltFor(player);
       player.lastTick = Date.now();
       tookOff = true;
     }
@@ -379,7 +383,16 @@ const Engine = (() => {
       player.pointsSpent += plane.cost;
       player.ownedPlanes.push(planeId);
     }
+    // Changement d'appareil : on conserve la position RELATIVE dans l'enveloppe
+    // (le pourcentage du plafond), pas l'altitude absolue. Sinon passer d'un
+    // Concorde à un Cessna écrêterait brutalement, et l'inverse offrirait un
+    // saut gratuit. Tout le reste du modèle étant déjà proportionnel au
+    // plafond, la progression est ainsi strictement conservée.
+    const oldCeiling = CONFIG.ceilingFor(player);
+    const ratio = oldCeiling > 0 ? (player.altitude || 0) / oldCeiling : 0;
     player.currentPlane = planeId;
+    player.altitude = Math.max(0, Math.min(1, ratio)) * plane.ceiling;
+    if (player.altitude > (player.maxAltitude || 0)) player.maxAltitude = player.altitude;
     State.save();
     return true;
   }
@@ -467,7 +480,7 @@ const Engine = (() => {
     const km = g.outbound ? (len - g.legKm) + len : g.legKm;
     const speed = player.crashed
       ? 0
-      : CONFIG.speedForAlt(player.altitude) * State.speedMult(player);
+      : State.airspeed(player);
     return { km: Math.round(km), hours: speed > 0 ? km / speed : null };
   }
 

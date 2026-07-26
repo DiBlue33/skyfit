@@ -832,6 +832,23 @@ button {
 .shop-item .level { font-size: 0.75rem; color: var(--accent); font-weight: 700; margin-top: 2px; }
 .shop-item.owned-current { border-color: var(--ok); background: rgba(39, 174, 96, 0.06); }
 
+/* Fiche technique d'un avion en boutique (v2.6) : croisière, plafond, écart */
+.shop-item .plane-specs {
+  display: flex; flex-wrap: wrap; gap: 6px 10px;
+  margin-top: 5px; font-size: 0.76rem; font-weight: 700;
+  color: var(--text-soft); letter-spacing: 0.01em;
+}
+.shop-item .plane-specs .plane-delta {
+  padding: 0 6px; border-radius: 999px; font-size: 0.72rem;
+}
+.shop-item .plane-specs .plane-delta.up {
+  color: var(--ok); background: rgba(39, 174, 96, 0.12);
+}
+.shop-item .plane-specs .plane-delta.down {
+  color: var(--danger, #e74c3c); background: rgba(231, 76, 60, 0.12);
+}
+
+
 /* Onglet Routes (v2.3) */
 .shop-note {
   background: rgba(41, 128, 185, 0.08);
@@ -1661,6 +1678,7 @@ button {
   .shop-item { padding: 10px 11px; gap: 8px; }
   .shop-item .name { font-size: 0.9rem; }
   .shop-item .desc { font-size: 0.74rem; }
+  .shop-item .plane-specs { font-size: 0.71rem; gap: 4px 8px; }
   .shop-tab { padding: 7px 10px; font-size: 0.76rem; }
   .shop-tabs { flex-wrap: wrap; }
   .shop-note { padding: 9px 11px; font-size: 0.76rem; }
