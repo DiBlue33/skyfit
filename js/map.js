@@ -261,14 +261,30 @@ const WorldMap = (() => {
    * eux aussi simulés en local à chaque seconde (Engine.simulateOthers),
    * leur `lastTick` est donc frais et l'extrapolation légitime.
    */
+  /**
+   * Vitesse SOL d'un pilote : vitesse air × facteur de vent, exactement la
+   * même formule que Engine.simulate. Extrapoler à la vitesse air donnait un
+   * glissement 7 à 25 % trop rapide ou trop lent, corrigé d'un coup à chaque
+   * tick du moteur → l'avion avançait par à-coups.
+   * Le vent est relevé à la position déjà connue (non extrapolée) : le moteur
+   * lui-même ne rafraîchit son facteur que tous les 150 km.
+   */
+  function groundKmh(p) {
+    const air = CONFIG.speedForAlt(p.altitude) * State.speedMult(p);
+    let f = 1;
+    try {
+      f = Weather.factorFor(Routes.geo(p), p.altitude, Date.now(), air);
+    } catch (e) { f = 1; }
+    return air * (isFinite(f) && f > 0 ? f : 1);
+  }
+
   function displayedLegKm(p) {
     const len = Routes.active(p).km || 1;
     let km = typeof p.legKm === 'number' ? p.legKm : 0;
     if (!p.crashed) {
       const dt = (Date.now() - (p.lastTick || 0)) / 1000;
       if (dt > 0 && dt < 5) {
-        const kmh = CONFIG.speedForAlt(p.altitude) * State.speedMult(p);
-        km += (p.legDir === 1 ? -1 : 1) * kmh * dt / 3600;
+        km += (p.legDir === 1 ? -1 : 1) * groundKmh(p) * dt / 3600;
       }
     }
     return clamp(km, 0, len);
@@ -287,7 +303,7 @@ const WorldMap = (() => {
         lon: g.lon, lat: g.lat, heading: g.heading, t: g.t,
         route: g.route, to: g.to, outbound: g.outbound, kmToNext: g.kmToNext,
         pending: Routes.pending(p),
-        speed: p.crashed ? 0 : Math.round(CONFIG.speedForAlt(p.altitude) * State.speedMult(p)),
+        speed: p.crashed ? 0 : Math.round(groundKmh(p)),
       };
     });
     return markers;
