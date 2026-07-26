@@ -10,6 +10,7 @@ const UI = (() => {
   let selectedActivity = 'running';
   let shopTab = 'planes';
   let lastAlt = null;
+  let lastWindPaint = 0;
 
   /* ---------- HUD ---------- */
 
@@ -51,9 +52,17 @@ const UI = (() => {
       trendEl.className = 'alt-trend down';
     }
 
-    // Vitesse (nulle si l'avion est au sol)
-    const speed = p.crashed ? 0 : CONFIG.speedForAlt(p.altitude) * State.speedMult(p);
+    // Vitesse affichée = vitesse SOL, vent compris (0 si l'avion est au sol)
+    const airspeed = p.crashed ? 0 : CONFIG.speedForAlt(p.altitude) * State.speedMult(p);
+    const speed = p.crashed ? 0 : airspeed * Weather.factorFor(p.totalKm, p.altitude, Date.now(), airspeed);
     $('speed-value').textContent = fmt(speed);
+
+    // Vent 🌬️ : badge + effets de scène (rafraîchis toutes les 5 s, pas à chaque tick)
+    if (Date.now() - lastWindPaint > 5000) {
+      lastWindPaint = Date.now();
+      WeatherUI.refreshBadge(p);
+      WeatherUI.refreshScene(p);
+    }
 
     // Scène (un avion qui a déjà crashé reste marqué à vie)
     Scene.update(p.altitude, speed);
@@ -497,7 +506,15 @@ const UI = (() => {
       : sum.altDelta > 0
         ? `a grimpé de ${fmt(sum.altDelta)} ft ▲`
         : `a perdu ${fmt(-sum.altDelta)} ft ▼`;
-    toast(`🛫 Pendant ton absence (${timeTxt}), ton avion a parcouru <b>${fmt(sum.km)} km</b> et ${altTxt}`, 7000);
+    // 🌬️ Effet moyen du vent réel sur la distance parcourue hors ligne
+    let windTxt = '';
+    if (typeof sum.wind === 'number' && Math.abs(sum.wind) >= 0.02) {
+      const p = Math.round(Math.abs(sum.wind) * 100);
+      windTxt = sum.wind > 0
+        ? ` — porté par un vent arrière (<b>+${p} %</b> de distance) 🌬️`
+        : ` — malgré un vent de face (<b>−${p} %</b> de distance) 🌬️`;
+    }
+    toast(`🛫 Pendant ton absence (${timeTxt}), ton avion a parcouru <b>${fmt(sum.km)} km</b> et ${altTxt}${windTxt}`, 7000);
   }
 
   /* ---------- Écouteurs ---------- */
@@ -537,6 +554,9 @@ const UI = (() => {
       btn.addEventListener('click', () => closeModal(btn.dataset.close)));
     document.querySelectorAll('.modal-backdrop').forEach(bd =>
       bd.addEventListener('click', (e) => { if (e.target === bd) bd.classList.remove('open'); }));
+
+    // Météo & vents 🌬️ (badge du HUD + panneau de prévisions)
+    WeatherUI.bind();
 
     // Déconnexion : retour à l'écran d'accueil
     $('btn-switch-player').addEventListener('click', () => Auth.logout());

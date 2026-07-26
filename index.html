@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkyFit — Fais du sport, garde ton avion en vol !</title>
-  <link rel="stylesheet" href="css/style.css?v=20260725a">
+  <link rel="stylesheet" href="css/style.css?v=20260726a">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>✈️</text></svg>">
 </head>
 <body>
@@ -58,6 +58,8 @@
       </div>
     </div>
     <div class="speed-line">Vitesse : <b id="speed-value">250</b> km/h</div>
+    <button id="wind-badge" type="button"
+            title="Vent en altitude — cliquer pour voir la météo et les prévisions"></button>
   </div>
 
   <!-- HUD : statistiques + ajout d'activité (bas gauche) -->
@@ -229,6 +231,25 @@
     </div>
   </div>
 
+  <!-- Modale : météo & vents -->
+  <div class="modal-backdrop" id="modal-weather">
+    <div class="modal modal-weather">
+      <div class="modal-header">
+        <h2>🌬️ Météo &amp; vents</h2>
+        <button class="modal-close" data-close="modal-weather" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="weather-now"></div>
+        <h3 class="stats-h3">🧭 Vent par altitude (maintenant)</h3>
+        <div id="weather-levels"></div>
+        <h3 class="stats-h3">📅 Prévisions J+1 / J+2</h3>
+        <div id="weather-advice"></div>
+        <div id="weather-grid"></div>
+        <div id="weather-source"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modale : carte du monde -->
   <div class="modal-backdrop" id="modal-map">
     <div class="modal modal-map">
@@ -322,20 +343,22 @@
   <!-- Toast -->
   <div id="toast"></div>
 
-  <script src="js/config.js?v=20260725a"></script>
-  <script src="js/state.js?v=20260725a"></script>
-  <script src="js/streak.js?v=20260725a"></script>
-  <script src="js/engine.js?v=20260725a"></script>
-  <script src="js/scene.js?v=20260725a"></script>
-  <script src="js/ui.js?v=20260725a"></script>
-  <script src="js/stats.js?v=20260725a"></script>
-  <script src="js/worlddata.js?v=20260725a"></script>
-  <script src="js/map.js?v=20260725a"></script>
-  <script src="js/achievements.js?v=20260725a"></script>
-  <script src="js/sync-config.js?v=20260725a"></script>
-  <script src="js/sync.js?v=20260725a"></script>
-  <script src="js/auth.js?v=20260725a"></script>
-  <script src="js/admin.js?v=20260725a"></script>
-  <script src="js/main.js?v=20260725a"></script>
+  <script src="js/config.js?v=20260726a"></script>
+  <script src="js/state.js?v=20260726a"></script>
+  <script src="js/streak.js?v=20260726a"></script>
+  <script src="js/engine.js?v=20260726a"></script>
+  <script src="js/weather.js?v=20260726a"></script>
+  <script src="js/scene.js?v=20260726a"></script>
+  <script src="js/ui.js?v=20260726a"></script>
+  <script src="js/weather-ui.js?v=20260726a"></script>
+  <script src="js/stats.js?v=20260726a"></script>
+  <script src="js/worlddata.js?v=20260726a"></script>
+  <script src="js/map.js?v=20260726a"></script>
+  <script src="js/achievements.js?v=20260726a"></script>
+  <script src="js/sync-config.js?v=20260726a"></script>
+  <script src="js/sync.js?v=20260726a"></script>
+  <script src="js/auth.js?v=20260726a"></script>
+  <script src="js/admin.js?v=20260726a"></script>
+  <script src="js/main.js?v=20260726a"></script>
 </body>
 </html>

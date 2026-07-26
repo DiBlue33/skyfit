@@ -84,6 +84,9 @@ const WorldMap = (() => {
       laps: Math.floor(km / TOTAL_KM),
       next: seg.to,
       kmToNext: Math.round(seg.len * (1 - t)),
+      // Utilisés par la météo : sur quel tronçon et où sur ce tronçon
+      segIndex: SEGS.indexOf(seg),
+      segT: t,
     };
   }
 
@@ -418,5 +421,10 @@ const WorldMap = (() => {
     return list;
   }
 
-  return { open, close, positionForKm, stops, TOTAL_KM };
+  /** Escales du tour du monde avec leurs coordonnées (source des relevés météo). */
+  function route() {
+    return ROUTE.map(w => ({ name: w.name, lon: w.lon, lat: w.lat }));
+  }
+
+  return { open, close, positionForKm, stops, route, TOTAL_KM };
 })();

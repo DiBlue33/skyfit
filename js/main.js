@@ -8,6 +8,7 @@ const Main = (() => {
 
   function init() {
     State.load();
+    Weather.init();     // 🌬️ vents réels : cache local puis rafraîchissement en fond
     Scene.init();
     UI.bind();
     Sync.startLoop();

@@ -17,9 +17,9 @@ const Engine = (() => {
     // Avion au sol après un crash : le temps passe mais rien n'avance
     if (player.crashed) {
       player.lastTick = Date.now();
-      return { km: 0, altDelta: 0, crashed: false };
+      return { km: 0, altDelta: 0, crashed: false, wind: 0 };
     }
-    if (seconds <= 0) return { km: 0, altDelta: 0, crashed: false };
+    if (seconds <= 0) return { km: 0, altDelta: 0, crashed: false, wind: 0 };
 
     const startAlt = player.altitude;
     let remaining = seconds;
@@ -30,9 +30,19 @@ const Engine = (() => {
     const burnPerS  = CONFIG.BURN_RATE_L_PER_HOUR / 3600;   // L/s
     const mult      = State.speedMult(player);
 
+    // 🌬️ Vent : la composante dans l'axe du vol modifie la vitesse sol.
+    // Recalculé par paliers (temps / distance / altitude) pour rester rapide
+    // même sur un rattrapage de plusieurs jours.
+    const windOn = CONFIG.WEATHER.ENABLED && typeof Weather !== 'undefined';
+    let simTime = player.lastTick || Date.now();
+    let windFactor = 1;
+    let windRefTime = -Infinity, windRefKm = 0, windRefAlt = -Infinity;
+    let windSumKm = 0, windSumRatio = 0;   // moyenne pondérée pour le résumé
+
     while (remaining > 0) {
       const dt = Math.min(CONFIG.SIM_STEP_S, remaining);
       remaining -= dt;
+      simTime += dt * 1000;
 
       // 1) Montée : brûler du kérosène si disponible
       if (player.kerosene > 0) {
@@ -53,10 +63,28 @@ const Engine = (() => {
         break;
       }
 
-      // 4) Distance parcourue pendant ce pas
-      const speedKmh = CONFIG.speedForAlt(player.altitude) * mult;
-      kmGained += speedKmh * (dt / 3600);
+      // 4) Distance parcourue pendant ce pas (vitesse air puis vitesse sol)
+      const airspeed = CONFIG.speedForAlt(player.altitude) * mult;
+
+      if (windOn) {
+        const kmNow = player.totalKm + kmGained;
+        if (simTime - windRefTime >= 900000 ||          // 15 min de simulation
+            Math.abs(kmNow - windRefKm) >= 150 ||       // 150 km parcourus
+            Math.abs(player.altitude - windRefAlt) >= 2000) {
+          windFactor = Weather.factorFor(kmNow, player.altitude, simTime, airspeed);
+          windRefTime = simTime; windRefKm = kmNow; windRefAlt = player.altitude;
+        }
+      }
+
+      const speedKmh = airspeed * windFactor;
+      const step = speedKmh * (dt / 3600);
+      kmGained += step;
+      windSumKm += step;
+      windSumRatio += (windFactor - 1) * step;
     }
+
+    // Effet moyen du vent sur la distance de ce pas de simulation
+    const avgWind = windSumKm > 0 ? windSumRatio / windSumKm : 0;
 
     player.totalKm += kmGained;
     player.lifetimeKm += kmGained;
@@ -66,7 +94,7 @@ const Engine = (() => {
 
     if (justCrashed) doCrash(player);
 
-    return { km: kmGained, altDelta: player.altitude - startAlt, crashed: justCrashed };
+    return { km: kmGained, altDelta: player.altitude - startAlt, crashed: justCrashed, wind: avgWind };
   }
 
   /** Crash : le record est archivé, le score de la tentative repart à 0. */
@@ -94,7 +122,7 @@ const Engine = (() => {
     const res = simulate(player, elapsedS);
 
     return summaryWorthy
-      ? { seconds: elapsedS, km: res.km, altDelta: res.altDelta, crashed: res.crashed }
+      ? { seconds: elapsedS, km: res.km, altDelta: res.altDelta, crashed: res.crashed, wind: res.wind }
       : null;
   }
 

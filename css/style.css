@@ -41,6 +41,8 @@ button {
   --sky-bottom: #bfe3ff;
   --cloud-color: #ffffff;
   --speed-factor: 1;
+  --wind-factor: 1;
+  --cloud-opacity: 1;
   background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
   transition: background 1.5s ease;
   overflow: hidden;
@@ -82,7 +84,9 @@ button {
 .cloud {
   position: absolute;
   left: 100%;
-  animation: cloud-move calc(var(--dur) / var(--speed-factor)) linear infinite;
+  animation: cloud-move calc(var(--dur) / (var(--speed-factor) * var(--wind-factor, 1))) linear infinite;
+  opacity: var(--cloud-opacity, 1);
+  transition: opacity 2s ease;
   animation-delay: var(--delay, 0s);
   will-change: transform;
 }
@@ -1417,8 +1421,9 @@ button {
   }
   .btn.small { padding: 6px 8px; font-size: 0.7rem; border-radius: 8px; }
 
-  /* Altimètre compact, au-dessus de la barre du bas */
-  #hud-alt { bottom: 74px; right: 8px; padding: 8px 10px; }
+  /* Altimètre compact, entièrement au-dessus de la barre du bas
+     (celle-ci fait ~112 px : bouton Statistiques + ligne Ajouter une séance) */
+  #hud-alt { bottom: 126px; right: 8px; padding: 8px 10px; }
   .altimeter { width: 86px; height: 86px; }
   .altimeter svg { width: 100%; height: 100%; }
   .alt-value { font-size: 0.9rem; }
@@ -1478,4 +1483,213 @@ button {
 @media (max-width: 380px) {
   .km-value { font-size: 0.95rem; }
   .pin-pad { grid-template-columns: repeat(3, 58px); }
+}
+
+/* ============================================================
+   Météo & vents 🌬️
+   ============================================================ */
+
+/* ---------- Badge du HUD (sous la vitesse) ---------- */
+
+#wind-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 5px 8px;
+  border: 1px solid rgba(46, 134, 222, 0.25);
+  border-radius: 10px;
+  background: rgba(46, 134, 222, 0.09);
+  color: var(--text);
+  font-size: 0.74rem;
+  line-height: 1.15;
+  text-align: left;
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+#wind-badge:hover { background: rgba(46, 134, 222, 0.18); }
+
+#wind-badge .wb-arrow {
+  display: inline-block;
+  font-size: 0.95rem;
+  /* La flèche « ➤ » pointe vers la droite au repos : 0° = vers le nord (haut) */
+  transform: rotate(calc(var(--rot, 90deg) - 90deg));
+  transition: transform 0.8s ease;
+}
+
+#wind-badge .wb-main { flex: 1; white-space: nowrap; }
+#wind-badge .wb-main b { font-weight: 800; }
+#wind-badge .wb-short { display: none; }
+
+#wind-badge .wb-effect {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 7px;
+  font-weight: 800;
+  font-size: 0.72rem;
+  background: rgba(120, 140, 160, 0.18);
+}
+
+#wind-badge.tail  { border-color: rgba(39, 174, 96, 0.35); background: rgba(39, 174, 96, 0.12); }
+#wind-badge.tail .wb-effect  { background: rgba(39, 174, 96, 0.26); color: #1c7a45; }
+#wind-badge.tail:hover { background: rgba(39, 174, 96, 0.2); }
+
+#wind-badge.head  { border-color: rgba(231, 76, 60, 0.35); background: rgba(231, 76, 60, 0.11); }
+#wind-badge.head .wb-effect  { background: rgba(231, 76, 60, 0.24); color: #b4342a; }
+#wind-badge.head:hover { background: rgba(231, 76, 60, 0.19); }
+
+#wind-badge.pending { opacity: 0.7; font-style: italic; }
+#wind-badge.stale::after { content: '⚠️'; font-size: 0.7rem; }
+
+/* ---------- Panneau météo ---------- */
+
+.modal-weather { max-width: 940px; }
+
+.wx-now {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 10px 0 4px;
+}
+
+.wx-card {
+  padding: 10px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(46, 134, 222, 0.07);
+}
+
+.wx-card-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-soft); }
+.wx-card-value { font-size: 1.15rem; font-weight: 800; margin: 3px 0 2px; display: flex; align-items: center; gap: 6px; }
+.wx-card-sub   { font-size: 0.74rem; color: var(--text-soft); }
+.wx-card.good  { background: rgba(39, 174, 96, 0.1);  border-color: rgba(39, 174, 96, 0.3); }
+.wx-card.good .wx-card-value { color: #1c7a45; }
+.wx-card.bad   { background: rgba(231, 76, 60, 0.09); border-color: rgba(231, 76, 60, 0.28); }
+.wx-card.bad .wx-card-value  { color: #b4342a; }
+
+.wx-card .wb-arrow {
+  display: inline-block;
+  transform: rotate(calc(var(--rot, 90deg) - 90deg));
+}
+
+.wx-empty {
+  margin: 14px 0;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(120, 140, 160, 0.1);
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* Tableau : vent par altitude */
+.wx-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.wx-table thead th {
+  font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-soft); font-weight: 700; text-align: left;
+  padding: 4px 6px; border-bottom: 1px solid var(--panel-border);
+}
+.wx-table tbody th { text-align: left; padding: 5px 6px; font-weight: 700; white-space: nowrap; }
+.wx-table td { padding: 5px 6px; border-top: 1px solid rgba(30, 50, 70, 0.07); }
+.wx-table tbody tr.current { background: rgba(46, 134, 222, 0.11); }
+.wx-table tbody tr.current th::after { content: ' ✈️'; }
+.wx-table .wx-arrow { width: 22px; }
+.wx-table .wx-arrow .wb-arrow { display: inline-block; transform: rotate(calc(var(--rot, 90deg) - 90deg)); }
+.wx-table .wx-kind.tail { color: #1c7a45; }
+.wx-table .wx-kind.head { color: #b4342a; }
+.wx-table .wx-eff { font-weight: 800; }
+.wx-table .wx-eff.good { color: #1c7a45; }
+.wx-table .wx-eff.bad  { color: #b4342a; }
+.wx-table .wx-ground { color: var(--text-soft); }
+
+.wx-hint { margin: 8px 0 2px; font-size: 0.74rem; color: var(--text-soft); line-height: 1.45; }
+
+/* Conseil : meilleur créneau */
+.wx-advice {
+  margin: 6px 0 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  background: rgba(39, 174, 96, 0.13);
+  border: 1px solid rgba(39, 174, 96, 0.3);
+}
+.wx-advice.bad { background: rgba(230, 126, 34, 0.12); border-color: rgba(230, 126, 34, 0.3); }
+
+/* Carte de chaleur altitude × heure */
+.wx-hm-wrap { overflow-x: auto; padding-bottom: 4px; }
+.wx-hm { min-width: 560px; }
+.wx-hm-row { display: flex; align-items: stretch; gap: 1px; margin-bottom: 1px; }
+.wx-hm-label {
+  flex: none; width: 34px; font-size: 0.64rem; color: var(--text-soft);
+  display: flex; align-items: center; justify-content: flex-end; padding-right: 5px;
+}
+.wx-hm-cell { flex: 1 1 0; min-width: 6px; height: 17px; border-radius: 2px; }
+.wx-hm-head .wx-hm-cell {
+  height: 12px; background: none !important; border-radius: 0;
+  font-size: 0.56rem; color: var(--text-soft); text-align: left; overflow: visible; white-space: nowrap;
+}
+.wx-hm-days {
+  display: flex;
+  margin: 4px 0 0 34px; font-size: 0.68rem; color: var(--text-soft);
+}
+.wx-hm-days span {
+  text-align: center; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-left: 1px solid rgba(30, 50, 70, 0.12);
+}
+.wx-hm-days span:first-child { border-left: none; }
+.wx-legend { margin-top: 8px; font-size: 0.72rem; color: var(--text-soft); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.wx-sw { display: inline-block; width: 16px; height: 11px; border-radius: 3px; margin-left: 8px; }
+.wx-source { margin-top: 12px; font-size: 0.7rem; color: var(--text-soft); line-height: 1.5; }
+.wx-err { color: var(--danger); font-style: italic; }
+
+/* ---------- Effets visuels dans la scène ---------- */
+
+#sky.wx-overcast { filter: saturate(0.82) brightness(0.93); }
+
+#rain { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.6s ease; }
+#rain.on { opacity: 0.55; }
+#rain i {
+  position: absolute;
+  top: -12%;
+  width: 1.5px;
+  height: var(--len, 14px);
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(210, 235, 255, 0.9));
+  animation: rain-fall var(--dur, 0.8s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+@keyframes rain-fall {
+  from { transform: translate(0, 0); }
+  to   { transform: translate(-14vw, 120vh); }
+}
+
+#plane.turbulence { animation: turb 0.42s ease-in-out infinite; }
+@keyframes turb {
+  0%, 100% { margin-top: 0;    transform: rotate(0deg); }
+  25%      { margin-top: -3px; transform: rotate(-1.1deg); }
+  75%      { margin-top: 3px;  transform: rotate(1.1deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #plane.turbulence { animation: none; }
+  #rain i { animation: none; }
+}
+
+/* ---------- Téléphone ---------- */
+@media (max-width: 640px) {
+  #wind-badge { margin-top: 5px; padding: 4px 6px; font-size: 0.63rem; gap: 4px; }
+  #wind-badge .wb-arrow { font-size: 0.8rem; }
+  #wind-badge .wb-effect { font-size: 0.62rem; padding: 1px 4px; }
+  #wind-badge .wb-long { display: none; }
+  #wind-badge .wb-short { display: inline; }
+
+  .wx-now { grid-template-columns: 1fr; gap: 7px; }
+  .wx-card-value { font-size: 1rem; }
+  .wx-table { font-size: 0.72rem; }
+  .wx-table thead th, .wx-table tbody th, .wx-table td { padding: 4px 3px; }
+  .wx-table .wx-ground { display: none; }
+  .wx-table thead th:last-child { display: none; }
+  .wx-hm-cell { height: 14px; }
 }

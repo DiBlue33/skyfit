@@ -37,6 +37,16 @@ const CONFIG = {
     MAX_MULT: 2.0,       // plafond : ×2 (atteint au 11e jour)
   },
 
+  // --- Météo & vents réels 🌬️ ---
+  // Les vents sont récupérés sur Open-Meteo par niveau de pression et
+  // appliqués selon le cap de l'avion : vent de dos = plus vite,
+  // vent de face = plus lentement. Effet borné pour rester jouable.
+  WEATHER: {
+    ENABLED: true,
+    MAX_RATIO: 0.25,     // effet max sur la vitesse : ±25 %
+    HOURS_AHEAD: 48,     // horizon des prévisions affichées (J+1 / J+2)
+  },
+
   // --- Activités sportives (litres de kérosène par minute) ---
   // Rendements calés sur l'intensité de l'effort
   ACTIVITIES: [

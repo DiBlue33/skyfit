@@ -121,5 +121,67 @@ const Scene = (() => {
     plane.classList.toggle('damaged', !isCrashed && isDamaged);
   }
 
-  return { init, setDecor, setPlane, setCondition, update };
+  /* ------------------------------------------------------------
+     Météo réelle : couverture nuageuse, pluie, turbulences
+     ------------------------------------------------------------ */
+
+  let rainLayer = null;
+  let lastRainOn = null;
+
+  function ensureRain() {
+    if (rainLayer) return rainLayer;
+    rainLayer = document.createElement('div');
+    rainLayer.id = 'rain';
+    for (let i = 0; i < 70; i++) {
+      const d = document.createElement('i');
+      d.style.left = (Math.random() * 110 - 5) + '%';
+      d.style.setProperty('--delay', (-Math.random() * 1.2).toFixed(2) + 's');
+      d.style.setProperty('--dur', (0.5 + Math.random() * 0.5).toFixed(2) + 's');
+      d.style.setProperty('--len', (10 + Math.random() * 18).toFixed(0) + 'px');
+      rainLayer.appendChild(d);
+    }
+    skyEl.appendChild(rainLayer);
+    return rainLayer;
+  }
+
+  /**
+   * Applique la météo réelle à la scène.
+   * @param w { ok, ratio, windSpeed, cross, cloud (0-100 ou null), precip (mm), code }
+   */
+  function setWeather(w) {
+    if (!skyEl) return;
+    if (!w || !w.ok) {
+      skyEl.classList.remove('wx-overcast', 'wx-windy', 'wx-turb');
+      skyEl.style.removeProperty('--wind-factor');
+      skyEl.style.removeProperty('--cloud-opacity');
+      if (rainLayer) rainLayer.classList.remove('on');
+      lastRainOn = false;
+      return;
+    }
+
+    // 1) Défilement des nuages : accéléré par le vent arrière, freiné de face
+    skyEl.style.setProperty('--wind-factor', (1 + w.ratio).toFixed(2));
+
+    // 2) Couverture nuageuse réelle : densité et opacité des nuages
+    if (typeof w.cloud === 'number') {
+      const c = Math.max(0, Math.min(100, w.cloud)) / 100;
+      skyEl.style.setProperty('--cloud-opacity', (0.35 + 0.65 * c).toFixed(2));
+      skyEl.classList.toggle('wx-overcast', c > 0.7);
+    }
+
+    // 3) Pluie
+    const rainOn = (w.precip || 0) > 0.05;
+    if (rainOn !== lastRainOn) {
+      ensureRain().classList.toggle('on', rainOn);
+      lastRainOn = rainOn;
+    }
+
+    // 4) Turbulences : vent fort ou orage → léger tremblement de l'avion
+    const turb = w.windSpeed > 110 || Math.abs(w.cross || 0) > 70 || (w.code >= 95);
+    skyEl.classList.toggle('wx-turb', !!turb);
+    skyEl.classList.toggle('wx-windy', w.windSpeed > 70);
+    if (plane) plane.classList.toggle('turbulence', !!turb);
+  }
+
+  return { init, setDecor, setPlane, setCondition, update, setWeather };
 })();
