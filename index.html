@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkyFit — Fais du sport, garde ton avion en vol !</title>
-  <link rel="stylesheet" href="css/style.css?v=20260726b">
+  <link rel="stylesheet" href="css/style.css?v=20260726c">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>✈️</text></svg>">
 </head>
 <body>
@@ -260,9 +260,18 @@
         <button class="modal-close" type="button">✕</button>
       </div>
       <div class="modal-body">
-        <div id="globe-wrap">
-          <canvas id="globe"></canvas>
-          <div class="globe-hint">🖱️ Fais glisser pour tourner le globe</div>
+        <div id="map-wrap">
+          <canvas id="map-canvas"></canvas>
+          <div id="map-flight"></div>
+          <div id="map-controls">
+            <button id="map-zoom-in" type="button" title="Zoomer" aria-label="Zoomer">+</button>
+            <button id="map-zoom-out" type="button" title="Dézoomer" aria-label="Dézoomer">−</button>
+            <button id="map-world" type="button" title="Voir toute la route, puis le monde" aria-label="Vue d'ensemble">🌍</button>
+            <button id="map-follow" type="button" title="Suivre mon avion" aria-label="Suivre mon avion">🎯</button>
+            <button id="map-wind" type="button" title="Afficher les vents en altitude" aria-label="Vents">🌬️</button>
+          </div>
+          <div id="map-scale"></div>
+          <div class="map-hint">Molette / pincement pour zoomer · glisse pour te déplacer</div>
         </div>
         <div id="map-legend"></div>
         <div id="map-total"></div>
@@ -345,23 +354,23 @@
   <!-- Toast -->
   <div id="toast"></div>
 
-  <script src="js/config.js?v=20260726b"></script>
-  <script src="js/routes.js?v=20260726b"></script>
-  <script src="js/state.js?v=20260726b"></script>
-  <script src="js/streak.js?v=20260726b"></script>
-  <script src="js/engine.js?v=20260726b"></script>
-  <script src="js/weather.js?v=20260726b"></script>
-  <script src="js/scene.js?v=20260726b"></script>
-  <script src="js/ui.js?v=20260726b"></script>
-  <script src="js/weather-ui.js?v=20260726b"></script>
-  <script src="js/stats.js?v=20260726b"></script>
-  <script src="js/worlddata.js?v=20260726b"></script>
-  <script src="js/map.js?v=20260726b"></script>
-  <script src="js/achievements.js?v=20260726b"></script>
-  <script src="js/sync-config.js?v=20260726b"></script>
-  <script src="js/sync.js?v=20260726b"></script>
-  <script src="js/auth.js?v=20260726b"></script>
-  <script src="js/admin.js?v=20260726b"></script>
-  <script src="js/main.js?v=20260726b"></script>
+  <script src="js/config.js?v=20260726c"></script>
+  <script src="js/routes.js?v=20260726c"></script>
+  <script src="js/state.js?v=20260726c"></script>
+  <script src="js/streak.js?v=20260726c"></script>
+  <script src="js/engine.js?v=20260726c"></script>
+  <script src="js/weather.js?v=20260726c"></script>
+  <script src="js/scene.js?v=20260726c"></script>
+  <script src="js/ui.js?v=20260726c"></script>
+  <script src="js/weather-ui.js?v=20260726c"></script>
+  <script src="js/stats.js?v=20260726c"></script>
+  <script src="js/worlddata.js?v=20260726c"></script>
+  <script src="js/map.js?v=20260726c"></script>
+  <script src="js/achievements.js?v=20260726c"></script>
+  <script src="js/sync-config.js?v=20260726c"></script>
+  <script src="js/sync.js?v=20260726c"></script>
+  <script src="js/auth.js?v=20260726c"></script>
+  <script src="js/admin.js?v=20260726c"></script>
+  <script src="js/main.js?v=20260726c"></script>
 </body>
 </html>
