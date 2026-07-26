@@ -1,94 +1,20 @@
 /* ============================================================
    SkyFit — Carte : globe terrestre avec les avions du classement
    ------------------------------------------------------------
-   Chaque pilote suit un tour du monde (escales ci-dessous).
-   Sa position = km parcourus modulo la longueur du tour.
+   Depuis la v2.3 chaque pilote vole sur SA route active, en
+   aller-retour entre Paris-CDG (LFPG) et la ville achetée.
+   Le tracé et la position viennent de js/routes.js
+   (Routes.path / Routes.geo) : la carte ne connaît plus aucune
+   géographie en propre.
    Globe orthographique dessiné en canvas, rotation à la souris.
    ============================================================ */
 
 const WorldMap = (() => {
 
-  // --- Tour du monde : escales (vers l'est depuis Paris) ---
-  const ROUTE = [
-    { name: 'Paris',        lon:   2.35, lat: 48.85 },
-    { name: 'Rome',         lon:  12.50, lat: 41.90 },
-    { name: 'Le Caire',     lon:  31.24, lat: 30.05 },
-    { name: 'Dubaï',        lon:  55.30, lat: 25.20 },
-    { name: 'Bombay',       lon:  72.88, lat: 19.08 },
-    { name: 'Bangkok',      lon: 100.50, lat: 13.75 },
-    { name: 'Tokyo',        lon: 139.69, lat: 35.68 },
-    { name: 'Honolulu',     lon: -157.86, lat: 21.31 },
-    { name: 'Los Angeles',  lon: -118.24, lat: 34.05 },
-    { name: 'Mexico',       lon:  -99.13, lat: 19.43 },
-    { name: 'New York',     lon:  -74.01, lat: 40.71 },
-    { name: 'Dakar',        lon:  -17.45, lat: 14.69 },
-  ];
-
-  const R_EARTH = 6371; // km
   const D2R = Math.PI / 180;
 
   // Marqueurs colorés par pilote
   const PLAYER_COLORS = ['#e74c3c', '#2e86de', '#27ae60', '#8e44ad', '#e67e22', '#16a085'];
-
-  // --- Géométrie sphérique ---
-
-  function toVec(lon, lat) {
-    const l = lon * D2R, p = lat * D2R;
-    return [Math.cos(p) * Math.cos(l), Math.cos(p) * Math.sin(l), Math.sin(p)];
-  }
-
-  function toLonLat(v) {
-    return [Math.atan2(v[1], v[0]) / D2R, Math.asin(Math.max(-1, Math.min(1, v[2]))) / D2R];
-  }
-
-  function haversine(a, b) {
-    const dLat = (b.lat - a.lat) * D2R, dLon = (b.lon - a.lon) * D2R;
-    const s = Math.sin(dLat / 2) ** 2 +
-      Math.cos(a.lat * D2R) * Math.cos(b.lat * D2R) * Math.sin(dLon / 2) ** 2;
-    return 2 * R_EARTH * Math.asin(Math.sqrt(s));
-  }
-
-  // Interpolation sur le grand cercle entre deux escales
-  function slerp(a, b, t) {
-    const va = toVec(a.lon, a.lat), vb = toVec(b.lon, b.lat);
-    const dot = Math.max(-1, Math.min(1, va[0] * vb[0] + va[1] * vb[1] + va[2] * vb[2]));
-    const omega = Math.acos(dot);
-    if (omega < 1e-6) return [a.lon, a.lat];
-    const sA = Math.sin((1 - t) * omega) / Math.sin(omega);
-    const sB = Math.sin(t * omega) / Math.sin(omega);
-    return toLonLat([
-      sA * va[0] + sB * vb[0],
-      sA * va[1] + sB * vb[1],
-      sA * va[2] + sB * vb[2],
-    ]);
-  }
-
-  // Distances cumulées le long du tour
-  const SEGS = [];
-  let TOTAL_KM = 0;
-  ROUTE.forEach((wp, i) => {
-    const next = ROUTE[(i + 1) % ROUTE.length];
-    const d = haversine(wp, next);
-    SEGS.push({ from: wp, to: next, start: TOTAL_KM, len: d });
-    TOTAL_KM += d;
-  });
-
-  // Position [lon, lat] + infos pour un kilométrage donné
-  function positionForKm(km) {
-    const d = ((km % TOTAL_KM) + TOTAL_KM) % TOTAL_KM;
-    const seg = SEGS.find(s => d >= s.start && d < s.start + s.len) || SEGS[SEGS.length - 1];
-    const t = (d - seg.start) / seg.len;
-    const [lon, lat] = slerp(seg.from, seg.to, t);
-    return {
-      lon, lat,
-      laps: Math.floor(km / TOTAL_KM),
-      next: seg.to,
-      kmToNext: Math.round(seg.len * (1 - t)),
-      // Utilisés par la météo : sur quel tronçon et où sur ce tronçon
-      segIndex: SEGS.indexOf(seg),
-      segT: t,
-    };
-  }
 
   // --- Rendu du globe ---
 
@@ -97,6 +23,8 @@ const WorldMap = (() => {
   let targetLon = null, targetLat = null; // animation de recentrage
   let dragging = false, lastX = 0, lastY = 0;
   let markers = [];                       // recalculés à l'ouverture
+  let tracks = [];                        // tracés des routes actives
+  let waypoints = [];                     // LFPG + destinations affichées
 
   function project(lon, lat, cx, cy, r) {
     const l = (lon + rotLon) * D2R, p = lat * D2R, p0 = -rotLat * D2R;
@@ -233,28 +161,25 @@ const WorldMap = (() => {
     ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke();
 
-    // Route (échantillonnée tous les ~250 km)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.lineWidth = 2;
+    // Routes actives des pilotes (une ligne pointillée par route, couleur du pilote)
+    ctx.lineWidth = 2.2;
     ctx.setLineDash([6, 6]);
-    const routePts = [];
-    for (let d = 0; d <= TOTAL_KM; d += 250) {
-      const p = positionForKm(d);
-      routePts.push([p.lon, p.lat]);
+    for (const tr of tracks) {
+      ctx.strokeStyle = tr.color;
+      drawPolyline(tr.pts, cx, cy, r);
+      ctx.stroke();
     }
-    drawPolyline(routePts, cx, cy, r);
-    ctx.stroke();
     ctx.setLineDash([]);
 
-    // Escales
+    // Escales : la base + les destinations affichées
     ctx.font = '11px sans-serif';
-    for (const wp of ROUTE) {
+    for (const wp of waypoints) {
       const pt = project(wp.lon, wp.lat, cx, cy, r);
       if (!pt.visible) continue;
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, 3, 0, 7); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.fillText(wp.name, pt.x + 6, pt.y - 5);
+      ctx.fillStyle = wp.base ? '#ffd166' : '#fff';
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, wp.base ? 4.5 : 3, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fillText(wp.label, pt.x + 6, pt.y - 5);
     }
 
     // Avions des pilotes
@@ -317,26 +242,48 @@ const WorldMap = (() => {
   function open() {
     const me = State.current(); // peut être null (carte depuis l'accueil)
 
-    // Marqueurs et légende
+    // Marqueurs, tracés et légende
     const players = State.allPlayers().slice().sort((a, b) => b.totalKm - a.totalKm);
     markers = players.map((p, i) => {
-      const pos = positionForKm(p.totalKm);
+      const g = Routes.geo(p);
       return {
         name: p.name, color: PLAYER_COLORS[i % PLAYER_COLORS.length],
-        km: p.totalKm, ...pos,
+        km: p.totalKm, crashed: !!p.crashed,
+        lon: g.lon, lat: g.lat,
+        route: g.route, to: g.to, outbound: g.outbound, kmToNext: g.kmToNext,
+        pending: Routes.pending(p),
       };
     });
 
+    // Un tracé par route active (dédoublonné), coloré par le premier pilote dessus
+    tracks = [];
+    waypoints = [{ lon: Routes.BASE.lon, lat: Routes.BASE.lat, label: Routes.BASE.icao, base: true }];
+    const seen = {};
+    markers.forEach(m => {
+      if (!m.route || seen[m.route.id]) return;
+      seen[m.route.id] = true;
+      tracks.push({ color: m.color, pts: Routes.path(m.route.id, 96) });
+      waypoints.push({ lon: m.route.lon, lat: m.route.lat, label: m.route.icao, base: false });
+    });
+
     const fmt = (n) => Math.floor(n).toLocaleString('fr-FR');
-    document.getElementById('map-legend').innerHTML = markers.length ? markers.map(m => `
+    document.getElementById('map-legend').innerHTML = markers.length ? markers.map(m => {
+      const dest = m.outbound ? m.to.city : Routes.BASE.city;
+      const état = m.crashed ? '💥 au sol' : `cap ${escapeHtml(dest)} (${fmt(m.kmToNext)} km)`;
+      const wait = m.pending ? ` · ⏳ ${escapeHtml(m.pending.icao)} au prochain passage LFPG` : '';
+      return `
       <button class="map-player" data-center="${m.lon.toFixed(2)},${m.lat.toFixed(2)}" type="button">
         <span class="dot" style="background:${m.color}"></span>
         <span class="mp-name">${me && m.name === me.name ? '<b>' + escapeHtml(m.name) + '</b>' : escapeHtml(m.name)}</span>
-        <span class="mp-info">${fmt(m.km)} km · tour n°${m.laps + 1} · prochaine escale : ${m.next.name} (${fmt(m.kmToNext)} km)</span>
-      </button>`).join('')
+        <span class="mp-info">${fmt(m.km)} km · ${escapeHtml(m.route.label)} · ${état}${wait}</span>
+      </button>`;
+    }).join('')
       : '<p style="text-align:center;color:#5c7186;font-size:0.85rem">Aucun pilote sur la carte pour l\'instant.</p>';
-    document.getElementById('map-total').textContent =
-      `Un tour du monde = ${fmt(TOTAL_KM)} km · ${ROUTE.length} escales`;
+
+    const total = Routes.all().length;
+    document.getElementById('map-total').textContent = me
+      ? `Base ${Routes.BASE.name} · ${Routes.owned(me).length}/${total} routes ouvertes · ${(me.visited || []).length} ville(s) visitée(s)`
+      : `${total} destinations au départ de ${Routes.BASE.name}`;
 
     document.querySelectorAll('#map-legend .map-player').forEach(btn =>
       btn.addEventListener('click', () => {
@@ -367,7 +314,7 @@ const WorldMap = (() => {
     if (mine) {
       rotLon = -mine.lon; rotLat = -Math.max(-75, Math.min(75, mine.lat));
     } else {
-      rotLon = -ROUTE[0].lon; rotLat = -ROUTE[0].lat;
+      rotLon = -Routes.BASE.lon; rotLat = -Routes.BASE.lat;
     }
     targetLon = targetLat = null;
 
@@ -414,17 +361,5 @@ const WorldMap = (() => {
 
   document.addEventListener('DOMContentLoaded', bind);
 
-  /** Escales avec leur distance d'arrivée depuis Paris (pour les succès). */
-  function stops() {
-    const list = SEGS.slice(1).map(s => ({ name: s.from.name, km: s.start }));
-    list.push({ name: 'Paris', km: TOTAL_KM }); // retour = tour complet
-    return list;
-  }
-
-  /** Escales du tour du monde avec leurs coordonnées (source des relevés météo). */
-  function route() {
-    return ROUTE.map(w => ({ name: w.name, lon: w.lon, lat: w.lat }));
-  }
-
-  return { open, close, positionForKm, stops, route, TOTAL_KM };
+  return { open, close };
 })();

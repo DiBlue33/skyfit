@@ -185,6 +185,43 @@ button {
 
 .points-value { font-size: 0.95rem; color: var(--accent-warm); font-weight: 700; margin-top: 2px; }
 
+/* Bandeau de route (v2.3) — LFPG ↔ ville, cap et km restants */
+.route-chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 6px;
+  margin-top: 5px;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.route-chip:empty { display: none; }
+
+.route-chip > span {
+  background: rgba(30, 50, 70, 0.07);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.rc-route { font-weight: 700; color: var(--text-soft); letter-spacing: 0.02em; }
+.rc-leg { font-weight: 700; color: var(--accent); background: rgba(41, 128, 185, 0.12) !important; }
+.rc-km { color: var(--text-soft); font-variant-numeric: tabular-nums; }
+
+.rc-pending {
+  color: var(--accent-warm);
+  font-weight: 700;
+  background: rgba(230, 126, 34, 0.14) !important;
+  animation: rc-pulse 2s ease-in-out infinite;
+}
+
+@keyframes rc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 #scoreboard { margin-top: 10px; border-top: 1px dashed var(--panel-border); padding-top: 8px; }
 
 .score-row {
@@ -794,6 +831,45 @@ button {
 .shop-item .desc { font-size: 0.8rem; color: var(--text-soft); margin-top: 2px; }
 .shop-item .level { font-size: 0.75rem; color: var(--accent); font-weight: 700; margin-top: 2px; }
 .shop-item.owned-current { border-color: var(--ok); background: rgba(39, 174, 96, 0.06); }
+
+/* Onglet Routes (v2.3) */
+.shop-note {
+  background: rgba(41, 128, 185, 0.08);
+  border: 1px solid rgba(41, 128, 185, 0.18);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.shop-note b { color: var(--text); }
+
+.shop-note.pending {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  background: rgba(230, 126, 34, 0.1);
+  border-color: rgba(230, 126, 34, 0.25);
+  color: var(--accent-warm);
+  font-weight: 600;
+}
+
+.shop-note.pending b { color: var(--accent-warm); }
+.shop-note.pending .btn { margin-left: auto; }
+
+.shop-group {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  font-weight: 700;
+  margin: 16px 0 6px;
+}
+
+.shop-group:first-of-type { margin-top: 8px; }
 
 .shop-points-banner {
   background: rgba(230, 126, 34, 0.1);
@@ -1410,6 +1486,8 @@ button {
   }
   .km-value { font-size: 1.05rem; }
   .points-value { font-size: 0.78rem; }
+  .route-chip { font-size: 0.62rem; gap: 3px 4px; margin-top: 4px; }
+  .route-chip > span { padding: 1px 6px; }
   #scoreboard { margin-top: 6px; padding-top: 5px; }
   .score-row { font-size: 0.72rem; gap: 8px; }
   .score-record { font-size: 0.62rem; }
@@ -1457,6 +1535,10 @@ button {
   .shop-item .name { font-size: 0.9rem; }
   .shop-item .desc { font-size: 0.74rem; }
   .shop-tab { padding: 7px 10px; font-size: 0.76rem; }
+  .shop-tabs { flex-wrap: wrap; }
+  .shop-note { padding: 9px 11px; font-size: 0.76rem; }
+  .shop-note.pending .btn { margin-left: 0; }
+  .shop-group { font-size: 0.7rem; margin: 13px 0 5px; }
 
   .journal-row { font-size: 0.8rem; padding: 8px 10px; gap: 7px; }
   .journal-row .j-gain { font-size: 0.74rem; }

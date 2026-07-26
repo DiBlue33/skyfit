@@ -6,10 +6,14 @@
    La composante est plafonnée à ±25 % de la vitesse air.
 
    Les vents sont récupérés par niveau de pression (1000 → 200 hPa)
-   sur les 12 escales du tour du monde, en une seule requête
-   multi-coordonnées, sur J-1 → J+2 (96 h). Tout est mis en cache
-   dans localStorage pour que le rattrapage hors ligne applique
+   sur les points de relevé de la ROUTE ACTIVE (LFPG ↔ ville), en une
+   seule requête multi-coordonnées, sur J-1 → J+2 (96 h). Tout est mis
+   en cache dans localStorage pour que le rattrapage hors ligne applique
    le vent réel de chaque heure passée.
+
+   ⚠️ Depuis la v2.3 les fonctions de consultation reçoivent une
+   « situation de vol » `geo` produite par Routes.geo(player) :
+   { route, t (0 = LFPG, 1 = destination), heading, lon, lat }.
 
    API : https://api.open-meteo.com/v1/forecast  (gratuit, sans clé)
    ============================================================ */
@@ -38,7 +42,7 @@ const Weather = (() => {
   const STALE_MS    = 12 * 3600 * 1000;  // au-delà, le cache est signalé « périmé »
 
   /* Données en mémoire :
-     { fetchedAt, t0, hours, points: [ { name, lon, lat,
+     { fetchedAt, routeId, t0, hours, points: [ { name, lon, lat, t,
          u: [level][hour], v: [level][hour],
          code: [hour], cloud: [hour], precip: [hour] } ] }        */
   let data = null;
@@ -56,7 +60,8 @@ const Weather = (() => {
       const raw = localStorage.getItem(CACHE_KEY);
       if (!raw) return false;
       const d = JSON.parse(raw);
-      if (d && Array.isArray(d.points) && d.points.length && d.hours > 0) {
+      // Un cache sans routeId vient de la v2.2 (tour du monde) : inutilisable.
+      if (d && d.routeId && Array.isArray(d.points) && d.points.length && d.hours > 0) {
         data = d;
         return true;
       }
@@ -73,8 +78,18 @@ const Weather = (() => {
      Récupération auprès d'Open-Meteo
      ------------------------------------------------------------ */
 
+  /** Route dont on relève les vents : celle du pilote connecté. */
+  function activeRouteId() {
+    try {
+      const p = (typeof State !== 'undefined') ? State.current() : null;
+      return Routes.active(p).id;
+    } catch (e) {
+      return Routes.DEFAULT_ROUTE;
+    }
+  }
+
   function buildUrl() {
-    const stops = WorldMap.route();
+    const stops = Routes.samplePoints(activeRouteId());
     const hourly = [];
     LEVELS.forEach(l => {
       hourly.push('wind_speed_' + l.hpa + 'hPa');
@@ -101,9 +116,9 @@ const Weather = (() => {
   }
 
   /** Transforme la réponse brute (tableau ou objet unique) en données compactes. */
-  function parse(json) {
+  function parse(json, routeId) {
     const arr = Array.isArray(json) ? json : [json];
-    const stops = WorldMap.route();
+    const stops = Routes.samplePoints(routeId);
     const points = [];
     let t0 = null, hours = 0;
 
@@ -134,6 +149,7 @@ const Weather = (() => {
         name: stop.name,
         lon: typeof res.longitude === 'number' ? res.longitude : stop.lon,
         lat: typeof res.latitude === 'number' ? res.latitude : stop.lat,
+        t: typeof stop.t === 'number' ? stop.t : (stops.length > 1 ? i / (stops.length - 1) : 0),
         u, v,
         code:   (h.weather_code   || []).slice(0, hours),
         cloud:  (h.cloud_cover    || []).slice(0, hours),
@@ -142,7 +158,7 @@ const Weather = (() => {
     });
 
     if (!points.length || t0 === null) return null;
-    return { fetchedAt: Date.now(), t0, hours, points };
+    return { fetchedAt: Date.now(), routeId: routeId || null, t0, hours, points };
   }
 
   /**
@@ -152,10 +168,14 @@ const Weather = (() => {
   function refresh(force) {
     if (fetching) return Promise.resolve(false);
     const now = Date.now();
-    if (!force) {
+    const routeId = activeRouteId();
+    // Changement de route : les relevés en cache ne sont plus au bon endroit.
+    const wrongRoute = !!data && data.routeId !== routeId;
+    if (!force && !wrongRoute) {
       if (data && now - data.fetchedAt < REFRESH_MS) return Promise.resolve(false);
       if (now - lastAttempt < RETRY_MS) return Promise.resolve(false);
     }
+    if (wrongRoute && !force && now - lastAttempt < RETRY_MS) return Promise.resolve(false);
     lastAttempt = now;
     fetching = true;
 
@@ -168,7 +188,7 @@ const Weather = (() => {
         return j;
       }))
       .then(json => {
-        const parsed = parse(json);
+        const parsed = parse(json, routeId);
         if (!parsed) throw new Error('réponse illisible');
         data = parsed;
         lastError = null;
@@ -232,15 +252,46 @@ const Weather = (() => {
     return { u: uA + (uB - uA) * f, v: vA + (vB - vA) * f };
   }
 
-  /** Cap suivi par l'avion (degrés, 0 = nord) au kilométrage donné. */
-  function headingAt(km) {
-    const a = WorldMap.positionForKm(km);
-    const b = WorldMap.positionForKm(km + 50);
-    const dLon = (b.lon - a.lon + 540) % 360 - 180;
-    const y = Math.sin(dLon * D2R) * Math.cos(b.lat * D2R);
-    const x = Math.cos(a.lat * D2R) * Math.sin(b.lat * D2R) -
-              Math.sin(a.lat * D2R) * Math.cos(b.lat * D2R) * Math.cos(dLon * D2R);
-    return (Math.atan2(y, x) * R2D + 360) % 360;
+  /**
+   * Situation de vol normalisée. Accepte :
+   *   - un objet `geo` issu de Routes.geo(player) / Routes.geoAt(...)
+   *   - un nombre = km parcourus depuis LFPG sur la route active (aller)
+   *   - rien = verticale LFPG
+   */
+  function asGeo(x) {
+    if (x && typeof x === 'object' && typeof x.t === 'number') return x;
+    if (typeof x === 'number' && isFinite(x)) {
+      return Routes.geoAt(activeRouteId(), x, 0);
+    }
+    return Routes.geoAt(activeRouteId(), 0, 0);
+  }
+
+  /**
+   * Points de relevé encadrant la situation de vol, et poids de mélange.
+   * Les points sont répartis uniformément en fraction de route (Routes.
+   * samplePoints), donc l'index réel vaut simplement t × (n − 1).
+   * Si le cache concerne une AUTRE route (relevé pas encore rafraîchi),
+   * on retombe sur le point géographiquement le plus proche : c'est
+   * approximatif mais toujours mieux qu'un vent nul.
+   */
+  function frame(geo) {
+    if (!data || !data.points || !data.points.length) return null;
+    const pts = data.points, n = pts.length;
+    const sameRoute = !data.routeId || !geo.route || data.routeId === geo.route.id;
+    if (!sameRoute) {
+      let bi = 0, bd = Infinity;
+      for (let i = 0; i < n; i++) {
+        const dLon = ((pts[i].lon - geo.lon + 540) % 360 - 180) * Math.cos(geo.lat * D2R);
+        const d = Math.hypot(dLon, pts[i].lat - geo.lat);
+        if (d < bd) { bd = d; bi = i; }
+      }
+      return { iA: bi, iB: bi, f: 0 };
+    }
+    if (n < 2) return { iA: 0, iB: 0, f: 0 };
+    const t = Math.max(0, Math.min(1, geo.t || 0));
+    const x = t * (n - 1);
+    const iA = Math.min(n - 2, Math.floor(x));
+    return { iA, iB: iA + 1, f: x - iA };
   }
 
   /* ------------------------------------------------------------
@@ -248,7 +299,7 @@ const Weather = (() => {
      ------------------------------------------------------------ */
 
   /**
-   * Vent subi à un kilométrage / une altitude / un instant.
+   * Vent subi dans une situation de vol / une altitude / un instant.
    * Retourne toujours un objet ; `ok:false` = pas de données (vent neutre).
    *   speed    : force du vent (km/h)
    *   dirFrom  : direction d'où vient le vent (degrés)
@@ -256,27 +307,25 @@ const Weather = (() => {
    *   cross    : composante latérale (km/h)
    *   heading  : cap de l'avion
    */
-  function windAt(km, altFt, timeMs) {
+  function windAt(where, altFt, timeMs) {
     const none = { ok: false, speed: 0, dirFrom: 0, tail: 0, cross: 0, heading: 0 };
-    if (!data) return none;
+    const geo = asGeo(where);
+    if (!data) return { ok: false, speed: 0, dirFrom: 0, tail: 0, cross: 0, heading: geo.heading };
     const hi = hourIndex(typeof timeMs === 'number' ? timeMs : Date.now());
     if (hi === null || hi < -1 || hi > data.hours) return none;
 
-    const pos = WorldMap.positionForKm(km);
-    const n = data.points.length;
-    const iA = Math.min(pos.segIndex === undefined ? 0 : pos.segIndex, n - 1);
-    const iB = (iA + 1) % n;
-    const t = pos.segT === undefined ? 0 : pos.segT;
+    const fr = frame(geo);
+    if (!fr) return none;
 
-    const a = uvAtPoint(data.points[iA], altFt, hi);
-    const b = uvAtPoint(data.points[iB], altFt, hi);
+    const a = uvAtPoint(data.points[fr.iA], altFt, hi);
+    const b = uvAtPoint(data.points[fr.iB], altFt, hi);
     let u, v;
-    if (a && b)      { u = a.u + (b.u - a.u) * t; v = a.v + (b.v - a.v) * t; }
+    if (a && b)      { u = a.u + (b.u - a.u) * fr.f; v = a.v + (b.v - a.v) * fr.f; }
     else if (a)      { u = a.u; v = a.v; }
     else if (b)      { u = b.u; v = b.v; }
     else return none;
 
-    const heading = headingAt(km);
+    const heading = geo.heading;
     const hr = heading * D2R;
     // Vecteur unitaire du cap en (est, nord)
     const tail  = u * Math.sin(hr) + v * Math.cos(hr);
@@ -296,9 +345,9 @@ const Weather = (() => {
   }
 
   /** Multiplicateur de vitesse sol (1 = vent nul). */
-  function factorFor(km, altFt, timeMs, airspeedKmh) {
+  function factorFor(where, altFt, timeMs, airspeedKmh) {
     if (!CONFIG.WEATHER.ENABLED) return 1;
-    const w = windAt(km, altFt, timeMs);
+    const w = windAt(where, altFt, timeMs);
     if (!w.ok) return 1;
     return 1 + ratioFor(w.tail, airspeedKmh);
   }
@@ -306,28 +355,28 @@ const Weather = (() => {
   /** Vent + effet, prêt pour l'affichage (badge HUD). */
   function summaryFor(player) {
     const airspeed = CONFIG.speedForAlt(player.altitude) * State.speedMult(player);
-    const w = windAt(player.totalKm, player.altitude, Date.now());
+    const geo = Routes.geo(player);
+    const w = windAt(geo, player.altitude, Date.now());
     const ratio = w.ok ? ratioFor(w.tail, airspeed) : 0;
     return {
       ok: w.ok && CONFIG.WEATHER.ENABLED,
       speed: w.speed, dirFrom: w.dirFrom, tail: w.tail, cross: w.cross,
       heading: w.heading, ratio,
       airspeed, ground: airspeed * (1 + ratio),
+      route: geo.route, to: geo.to, from: geo.from, outbound: geo.outbound,
       stale: !data || (Date.now() - data.fetchedAt > STALE_MS),
     };
   }
 
   /** Conditions au sol (nuages, pluie, code météo) à la position du joueur. */
-  function conditionsAt(km, timeMs) {
+  function conditionsAt(where, timeMs) {
     const none = { ok: false, cloud: 0, precip: 0, code: 0 };
     if (!data) return none;
     const hi = hourIndex(typeof timeMs === 'number' ? timeMs : Date.now());
     if (hi === null || hi < -1 || hi > data.hours) return none;
-    const pos = WorldMap.positionForKm(km);
-    const n = data.points.length;
-    const iA = Math.min(pos.segIndex || 0, n - 1);
-    const iB = (iA + 1) % n;
-    const t = pos.segT || 0;
+    const fr = frame(asGeo(where));
+    if (!fr) return none;
+    const iA = fr.iA, iB = fr.iB, t = fr.f;
     const mix = (key) => {
       const a = atHour(data.points[iA][key], hi);
       const b = atHour(data.points[iB][key], hi);
@@ -359,13 +408,13 @@ const Weather = (() => {
     // Heure pleine courante (UTC local du navigateur)
     const start = new Date(); start.setMinutes(0, 0, 0);
     const t0 = start.getTime();
-    const km = player.totalKm;
+    const geo = Routes.geo(player);
 
     const rows = alts.map(ft => {
       const airspeed = CONFIG.speedForAlt(ft) * mult;
       const cells = [];
       for (let h = 0; h < H; h++) {
-        const w = windAt(km, ft, t0 + h * 3600000);
+        const w = windAt(geo, ft, t0 + h * 3600000);
         cells.push(w.ok
           ? { ok: true, tail: w.tail, speed: w.speed, dirFrom: w.dirFrom, ratio: ratioFor(w.tail, airspeed) }
           : { ok: false, tail: 0, speed: 0, dirFrom: 0, ratio: 0 });
@@ -399,12 +448,18 @@ const Weather = (() => {
   }
 
   function info() {
-    return data
-      ? { fetchedAt: data.fetchedAt, hours: data.hours, t0: data.t0,
-          points: data.points.length,
-          stale: Date.now() - data.fetchedAt > STALE_MS,
-          error: lastError }
-      : null;
+    if (!data) return null;
+    const route = Routes.byId(data.routeId);
+    return {
+      fetchedAt: data.fetchedAt, hours: data.hours, t0: data.t0,
+      points: data.points.length,
+      routeId: data.routeId,
+      routeLabel: route ? route.label : '—',
+      routeCity: route ? route.city : null,
+      wrongRoute: data.routeId !== activeRouteId(),
+      stale: Date.now() - data.fetchedAt > STALE_MS,
+      error: lastError,
+    };
   }
 
   /** Dernier échec de relevé (null si tout va bien) — aide au diagnostic. */
@@ -426,7 +481,7 @@ const Weather = (() => {
   return {
     init, refresh, onUpdate, load,
     windAt, ratioFor, factorFor, summaryFor, conditionsAt,
-    forecastGrid, bestWindow, headingAt, info, error,
+    forecastGrid, bestWindow, activeRouteId, info, error,
     LEVELS, _setData,
   };
 })();

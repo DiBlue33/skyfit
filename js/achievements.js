@@ -20,35 +20,69 @@ const Achievements = (() => {
 
   /* ---------- Définition des succès ---------- */
 
-  const CITY_ICONS = {
-    'Rome': '🏛️', 'Le Caire': '🐪', 'Dubaï': '🌆', 'Bombay': '🕌',
-    'Bangkok': '🛕', 'Tokyo': '⛩️', 'Honolulu': '🌺', 'Los Angeles': '🎬',
-    'Mexico': '🌵', 'New York': '🗽', 'Dakar': '🦁', 'Paris': '🗼',
-  };
-
   function slug(s) {
     return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]+/g, '_');
   }
 
+  /** Récompense d'une visite : proportionnelle à la distance, arrondie à 25 L. */
+  function visitReward(km) {
+    return 25 * Math.round(Math.max(50, Math.min(1200, km / 12)) / 25);
+  }
+
+  const VOYAGE_GROUPS = Routes.REGIONS.map(r => 'Voyages · ' + r);
+
   function buildDefs() {
     const defs = [];
 
-    // --- Voyages : atteindre chaque escale en une seule tentative ---
-    WorldMap.stops().forEach(stop => {
-      const isParis = stop.name === 'Paris';
-      defs.push({
-        id: 'visit_' + slug(stop.name),
-        group: 'Voyages',
-        icon: CITY_ICONS[stop.name] || '📍',
-        name: isParis ? 'Tour du monde complet !' : `Visite à ${stop.name}`,
-        desc: isParis
-          ? `Revenir à Paris : ${fmt(stop.km)} km en une seule tentative`
-          : `Atteindre ${stop.name} (${fmt(stop.km)} km) sans crasher`,
-        reward: isParis ? 500 : 100,
-        test: (p) => bestRun(p) >= stop.km,
-        prog: (p) => [Math.min(bestRun(p), stop.km), stop.km],
+    // --- Voyages : se poser dans chaque ville du réseau (v2.3) ---
+    Routes.all().slice()
+      .sort((a, b) => a.km - b.km)
+      .forEach(r => {
+        defs.push({
+          id: 'visit_' + slug(r.city),
+          group: 'Voyages · ' + r.region,
+          icon: r.icon,
+          name: `Visite à ${r.city}`,
+          desc: `Se poser à ${r.city} (${r.icao}) — ${fmt(r.km)} km depuis ${Routes.BASE.city}`,
+          reward: visitReward(r.km),
+          test: (p) => Routes.hasVisited(p, r.city),
+        });
       });
+
+    // --- Réseau : ampleur du carnet de vol ---
+    const CITY_STEPS = [[3, 150, '🧭'], [10, 400, '🗺️'], [20, 900, '🌐'], [35, 2000, '🛰️']];
+    CITY_STEPS.forEach(([n, reward, icon]) => defs.push({
+      id: 'cities_' + n,
+      group: 'Réseau',
+      icon,
+      name: `${n} villes visitées`,
+      desc: `Se poser dans ${n} villes différentes du réseau`,
+      reward,
+      test: (p) => (p.visited || []).length >= n,
+      prog: (p) => [Math.min((p.visited || []).length, n), n],
+    }));
+
+    defs.push({
+      id: 'world_tour',
+      group: 'Réseau',
+      icon: '🌍',
+      name: 'Tour du monde complet !',
+      desc: `Visiter au moins une ville dans chacune des ${Routes.REGIONS.length} régions du réseau`,
+      reward: 1500,
+      test: (p) => Routes.regionsVisited(p) >= Routes.REGIONS.length,
+      prog: (p) => [Routes.regionsVisited(p), Routes.REGIONS.length],
+    });
+
+    defs.push({
+      id: 'landings_100',
+      group: 'Réseau',
+      icon: '🛬',
+      name: '100 atterrissages',
+      desc: 'Arriver 100 fois à destination',
+      reward: 500,
+      test: (p) => (p.landings || 0) >= 100,
+      prog: (p) => [Math.min(p.landings || 0, 100), 100],
     });
 
     // --- Assiduité : nombre de séances ---
@@ -222,7 +256,8 @@ const Achievements = (() => {
     const p = State.current();
     if (!p) return;
 
-    const groups = ['Voyages', 'Assiduité', 'Séries', 'Flotte', 'Décors', 'Divers'];
+    const groups = VOYAGE_GROUPS.concat(
+      ['Réseau', 'Assiduité', 'Séries', 'Flotte', 'Décors', 'Divers']);
     const all = defs();
     const claimed = all.filter(d => status(p, d) === 'claimed').length;
     $('ach-summary').textContent =

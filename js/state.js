@@ -25,6 +25,15 @@ const State = (() => {
       ownedDecors: ['day'],
       currentDecor: 'day',
       upgrades: { yield: 0, aero: 0, tank: 0 },
+      // Réseau de routes (v2.3) — départ de LFPG, Lyon offert
+      ownedRoutes: [Routes.DEFAULT_ROUTE],
+      currentRoute: Routes.DEFAULT_ROUTE,
+      pendingRoute: null,          // route demandée, effective à la verticale LFPG
+      legKm: 0,                    // km parcourus depuis LFPG sur la route active
+      legDir: 0,                   // 0 = aller (LFPG → ville), 1 = retour
+      visited: [],                 // villes déjà atteintes (ordre chronologique)
+      landings: 0,                 // nombre d'arrivées à destination
+      baseTouches: 0,              // nombre de passages à la verticale de LFPG
       // Journal des séances
       activityLog: [],             // { activityId, minutes, kero, date }
       totalSportMinutes: 0,
@@ -58,6 +67,7 @@ const State = (() => {
   function migrate() {
     const planeIds = CONFIG.PLANES.map(p => p.id);
     const decorIds = CONFIG.DECORS.map(d => d.id);
+    const routeIds = Routes.all().map(r => r.id);
     Object.values(data.players).forEach(p => {
       // Listes potentiellement perdues/déformées par Firebase
       if (!Array.isArray(p.activityLog)) {
@@ -96,7 +106,71 @@ const State = (() => {
       if (typeof p.maxAltitude !== 'number') p.maxAltitude = Math.max(p.altitude || 0, CONFIG.ALT_START);
       // Séries de jours consécutifs (v2.1) — recalculées depuis le journal
       if (typeof p.bestStreak !== 'number') p.bestStreak = 0;
+      // Réseau de routes (v2.3)
+      migrateRoutes(p, routeIds);
     });
+  }
+
+  /* ------------------------------------------------------------
+     Anciennes escales du tour du monde (v1 → v2.2) avec leur
+     kilométrage cumulé : sert une seule fois à créditer les villes
+     déjà visitées par les pilotes existants.
+     ------------------------------------------------------------ */
+  const LEGACY_STOPS = [
+    ['Rome', 1105], ['Le Caire', 3237], ['Dubaï', 5663], ['Bombay', 7595],
+    ['Bangkok', 10597], ['Tokyo', 15200], ['Honolulu', 21405],
+    ['Los Angeles', 25526], ['Mexico', 28016], ['New York', 31375], ['Dakar', 37523],
+  ];
+
+  function migrateRoutes(p, routeIds) {
+    const first = !Array.isArray(p.visited) && !p.visited;
+
+    if (!Array.isArray(p.ownedRoutes)) {
+      p.ownedRoutes = p.ownedRoutes ? Object.values(p.ownedRoutes) : [];
+    }
+    if (!Array.isArray(p.visited)) {
+      p.visited = p.visited ? Object.values(p.visited) : [];
+    }
+    p.ownedRoutes = p.ownedRoutes.filter(id => routeIds.includes(id));
+    if (!p.ownedRoutes.includes(Routes.DEFAULT_ROUTE)) {
+      p.ownedRoutes.unshift(Routes.DEFAULT_ROUTE);
+    }
+    if (!routeIds.includes(p.currentRoute)) p.currentRoute = Routes.DEFAULT_ROUTE;
+    if (!p.ownedRoutes.includes(p.currentRoute)) p.currentRoute = Routes.DEFAULT_ROUTE;
+    if (p.pendingRoute && !routeIds.includes(p.pendingRoute)) p.pendingRoute = null;
+    if (typeof p.legKm !== 'number' || !isFinite(p.legKm) || p.legKm < 0) p.legKm = 0;
+    if (p.legDir !== 1) p.legDir = 0;
+    if (typeof p.landings !== 'number') p.landings = 0;
+    if (typeof p.baseTouches !== 'number') p.baseTouches = 0;
+
+    // Reprise de l'historique : villes atteintes du temps du tour du monde,
+    // pour ne pas retirer aux pilotes des succès déjà gagnés.
+    if (first) {
+      /** Ville déjà atteinte sous l'ancien tour du monde : visite + route offerte. */
+      const grant = (city) => {
+        const r = Routes.byCity(city);
+        if (!r) return;
+        if (!p.visited.includes(city)) p.visited.push(city);
+        if (!p.ownedRoutes.includes(r.id)) p.ownedRoutes.push(r.id);
+      };
+
+      const best = Math.max(p.bestKm || 0, p.totalKm || 0);
+      LEGACY_STOPS.forEach(([city, km]) => { if (best >= km) grant(city); });
+
+      // Succès de visite déjà réclamés : la ville a bel et bien été survolée,
+      // même si le score de la tentative a été remis à zéro par un crash.
+      const CITIES = Routes.all().map(r => r.city);
+      Object.keys(p.claimedAchievements || {}).forEach(id => {
+        if (id.indexOf('visit_') !== 0) return;
+        const city = CITIES.find(c => 'visit_' + slug(c) === id);
+        if (city) grant(city);
+      });
+    }
+  }
+
+  function slug(s) {
+    return String(s).toLowerCase().normalize('NFD')
+      .replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '_');
   }
 
   /**

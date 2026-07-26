@@ -17,9 +17,9 @@ const Engine = (() => {
     // Avion au sol après un crash : le temps passe mais rien n'avance
     if (player.crashed) {
       player.lastTick = Date.now();
-      return { km: 0, altDelta: 0, crashed: false, wind: 0 };
+      return { km: 0, altDelta: 0, crashed: false, wind: 0, route: noRouteEvents() };
     }
-    if (seconds <= 0) return { km: 0, altDelta: 0, crashed: false, wind: 0 };
+    if (seconds <= 0) return { km: 0, altDelta: 0, crashed: false, wind: 0, route: noRouteEvents() };
 
     const startAlt = player.altitude;
     let remaining = seconds;
@@ -38,6 +38,9 @@ const Engine = (() => {
     let windFactor = 1;
     let windRefTime = -Infinity, windRefKm = 0, windRefAlt = -Infinity;
     let windSumKm = 0, windSumRatio = 0;   // moyenne pondérée pour le résumé
+
+    // 🗺️ Événements de route rencontrés pendant ce pas de simulation
+    const routeEvents = noRouteEvents();
 
     while (remaining > 0) {
       const dt = Math.min(CONFIG.SIM_STEP_S, remaining);
@@ -71,7 +74,7 @@ const Engine = (() => {
         if (simTime - windRefTime >= 900000 ||          // 15 min de simulation
             Math.abs(kmNow - windRefKm) >= 150 ||       // 150 km parcourus
             Math.abs(player.altitude - windRefAlt) >= 2000) {
-          windFactor = Weather.factorFor(kmNow, player.altitude, simTime, airspeed);
+          windFactor = Weather.factorFor(Routes.geo(player), player.altitude, simTime, airspeed);
           windRefTime = simTime; windRefKm = kmNow; windRefAlt = player.altitude;
         }
       }
@@ -81,6 +84,29 @@ const Engine = (() => {
       kmGained += step;
       windSumKm += step;
       windSumRatio += (windFactor - 1) * step;
+
+      // 5) Avancement le long de la route active (aller-retour sans fin)
+      const ev = Routes.advance(player, step);
+      if (ev.baseTouches) {
+        routeEvents.baseTouches += ev.baseTouches;
+        player.baseTouches = (player.baseTouches || 0) + ev.baseTouches;
+      }
+      if (ev.switched) routeEvents.switched = ev.switched;
+      if (ev.arrivals.length) {
+        player.landings = (player.landings || 0) + ev.arrivals.length;
+        ev.arrivals.forEach(city => {
+          routeEvents.arrivals.push(city);
+          if (!Array.isArray(player.visited)) player.visited = [];
+          if (player.visited.indexOf(city) < 0) {
+            // 🎉 Première visite : prime de kérosène généreuse (une seule fois)
+            player.visited.push(city);
+            const bonus = arrivalBonus(player, city);
+            player.kerosene = Math.min(State.tankCapacity(player), player.kerosene + bonus);
+            routeEvents.firstVisits.push({ city, kero: bonus });
+            logDiscovery(player, city, bonus, simTime);
+          }
+        });
+      }
     }
 
     // Effet moyen du vent sur la distance de ce pas de simulation
@@ -94,7 +120,41 @@ const Engine = (() => {
 
     if (justCrashed) doCrash(player);
 
-    return { km: kmGained, altDelta: player.altitude - startAlt, crashed: justCrashed, wind: avgWind };
+    return {
+      km: kmGained, altDelta: player.altitude - startAlt,
+      crashed: justCrashed, wind: avgWind, route: routeEvents,
+    };
+  }
+
+  function noRouteEvents() {
+    return { arrivals: [], firstVisits: [], baseTouches: 0, switched: null };
+  }
+
+  /**
+   * Prime de PREMIÈRE visite d'une ville : proportionnelle à l'éloignement,
+   * plafonnée aux trois quarts du réservoir pour rester utile.
+   */
+  function arrivalBonus(player, city) {
+    const r = Routes.byCity(city);
+    const km = r ? r.km : 500;
+    return Math.round(Math.min(State.tankCapacity(player) * 0.75,
+                               Math.max(200, km * 0.3)));
+  }
+
+  /** Trace la découverte dans le journal partagé (visible par l'autre pilote). */
+  function logDiscovery(player, city, kero, ts) {
+    const r = Routes.byCity(city);
+    if (!Array.isArray(player.activityLog)) player.activityLog = [];
+    player.activityLog.push({
+      activityId: 'discovery',
+      minutes: 0,
+      kero: Math.round(kero),
+      date: (typeof ts === 'number' && isFinite(ts)) ? ts : Date.now(),
+      loggedAt: Date.now(),
+      city: city,
+      cityIcon: r ? r.icon : '📍',
+    });
+    if (player.activityLog.length > 500) player.activityLog.shift();
   }
 
   /** Crash : le record est archivé, le score de la tentative repart à 0. */
@@ -104,6 +164,7 @@ const Engine = (() => {
     player.kerosene = 0;
     if (player.totalKm > player.bestKm) player.bestKm = player.totalKm;
     player.totalKm = 0;   // le score recommence à zéro
+    Routes.resetToBase(player);   // on repart de LFPG, route conservée
     State.save();
   }
 
@@ -122,7 +183,8 @@ const Engine = (() => {
     const res = simulate(player, elapsedS);
 
     return summaryWorthy
-      ? { seconds: elapsedS, km: res.km, altDelta: res.altDelta, crashed: res.crashed, wind: res.wind }
+      ? { seconds: elapsedS, km: res.km, altDelta: res.altDelta,
+          crashed: res.crashed, wind: res.wind, route: res.route }
       : null;
   }
 
@@ -242,5 +304,69 @@ const Engine = (() => {
     return true;
   }
 
-  return { simulate, catchUp, logActivity, upgradeCost, buyPlane, buyDecor, buyUpgrade };
+  /* --- Routes (v2.3) --- */
+
+  /** Achat définitif d'une route. Ne la rend pas active pour autant. */
+  function buyRoute(player, routeId) {
+    const r = Routes.byId(routeId);
+    if (!r) return { ok: false, reason: 'inconnue' };
+    if (Routes.isOwned(player, routeId)) return { ok: true, bought: false, route: r };
+    if (State.availablePoints(player) < r.cost) return { ok: false, reason: 'points', route: r };
+    if (!Array.isArray(player.ownedRoutes)) player.ownedRoutes = [Routes.DEFAULT_ROUTE];
+    player.pointsSpent += r.cost;
+    player.ownedRoutes.push(routeId);
+    State.save();
+    return { ok: true, bought: true, route: r };
+  }
+
+  /**
+   * Demande d'envoi de l'avion sur une route.
+   * Le changement n'est effectif qu'à la prochaine VERTICALE DE LFPG —
+   * sauf si l'avion y est déjà (ou au sol après un crash).
+   */
+  function setRoute(player, routeId) {
+    const r = Routes.byId(routeId);
+    if (!r) return { ok: false, reason: 'inconnue' };
+    if (!Routes.isOwned(player, routeId)) return { ok: false, reason: 'non_achetee', route: r };
+
+    if (player.currentRoute === routeId) {
+      player.pendingRoute = null;
+      State.save();
+      return { ok: true, immediate: true, already: true, route: r };
+    }
+    const atBase = player.crashed || (player.legDir === 0 && (player.legKm || 0) <= 1);
+    if (atBase) {
+      player.currentRoute = routeId;
+      player.pendingRoute = null;
+      player.legKm = 0;
+      player.legDir = 0;
+      State.save();
+      return { ok: true, immediate: true, route: r };
+    }
+    player.pendingRoute = routeId;
+    State.save();
+    return { ok: true, immediate: false, route: r, eta: etaToBase(player) };
+  }
+
+  /** Annule une demande de changement de route encore en attente. */
+  function cancelPendingRoute(player) {
+    player.pendingRoute = null;
+    State.save();
+  }
+
+  /** Distance et durée estimées jusqu'au prochain passage à la verticale de LFPG. */
+  function etaToBase(player) {
+    const g = Routes.geo(player);
+    const len = g.route.km || 1;
+    const km = g.outbound ? (len - g.legKm) + len : g.legKm;
+    const speed = player.crashed
+      ? 0
+      : CONFIG.speedForAlt(player.altitude) * State.speedMult(player);
+    return { km: Math.round(km), hours: speed > 0 ? km / speed : null };
+  }
+
+  return {
+    simulate, catchUp, logActivity, upgradeCost, buyPlane, buyDecor, buyUpgrade,
+    buyRoute, setRoute, cancelPendingRoute, etaToBase, arrivalBonus,
+  };
 })();

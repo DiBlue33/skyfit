@@ -41,8 +41,9 @@ const Main = (() => {
     tickInterval = setInterval(() => {
       const p = State.current();
       if (!p) return;
-      Engine.simulate(p, (Date.now() - p.lastTick) / 1000);
+      const res = Engine.simulate(p, (Date.now() - p.lastTick) / 1000);
       UI.refreshHUD();
+      if (res && res.route) UI.flightEvents(res.route);   // 🛬 arrivées & changements de cap
     }, CONFIG.TICK_MS);
 
     if (startLoop.bound) return;

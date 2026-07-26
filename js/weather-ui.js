@@ -103,8 +103,8 @@ const WeatherUI = (() => {
 
     const info = Weather.info();
     const w = Weather.summaryFor(p);
-    const pos = WorldMap.positionForKm(p.totalKm);
-    const cond = Weather.conditionsAt(p.totalKm, Date.now());
+    const geo = Routes.geo(p);
+    const cond = Weather.conditionsAt(geo, Date.now());
 
     /* --- Bloc « maintenant » --- */
     if (!info) {
@@ -127,9 +127,9 @@ const WeatherUI = (() => {
     $('weather-now').innerHTML = `
       <div class="wx-now">
         <div class="wx-card">
-          <div class="wx-card-label">Position</div>
-          <div class="wx-card-value">${c.icon} ${escape(pos.next ? 'cap ' + pos.next.name : '—')}</div>
-          <div class="wx-card-sub">${escape(c.label)}${cond.ok ? ` · ${fmt(cond.cloud)} % de nuages` : ''}</div>
+          <div class="wx-card-label">Position · ${escape(geo.route.label)}</div>
+          <div class="wx-card-value">${c.icon} ${escape('cap ' + (geo.outbound ? geo.to.city : Routes.BASE.city))}</div>
+          <div class="wx-card-sub">${fmt(geo.kmToNext)} km restants · ${escape(c.label)}${cond.ok ? ` · ${fmt(cond.cloud)} % de nuages` : ''}</div>
         </div>
         <div class="wx-card">
           <div class="wx-card-label">Vent à ${fmt(p.altitude)} ft</div>
@@ -254,7 +254,8 @@ const WeatherUI = (() => {
     const when = age < 60 ? `il y a ${age} min` : `il y a ${Math.round(age / 60)} h`;
     return `<p class="wx-source">${base} Relevé ${when}` +
       (info.stale ? ' — <b>cache hors ligne</b>' : '') +
-      `, ${info.points} points le long du tour du monde.` +
+      `, ${info.points} points le long de la route ${escape(info.routeLabel || '')}.` +
+      (info.wrongRoute ? '<br><span class="wx-err">Route changée : nouveau relevé en cours…</span>' : '') +
       (info.error ? `<br><span class="wx-err">Dernier essai de mise à jour : ${escape(info.error)}</span>` : '') +
       '</p>';
   }
@@ -269,7 +270,7 @@ const WeatherUI = (() => {
   function refreshScene(p) {
     if (typeof Scene.setWeather !== 'function') return;
     const w = Weather.summaryFor(p);
-    const c = Weather.conditionsAt(p.totalKm, Date.now());
+    const c = Weather.conditionsAt(Routes.geo(p), Date.now());
     Scene.setWeather({
       ok: w.ok,
       ratio: w.ratio,

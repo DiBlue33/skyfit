@@ -54,8 +54,11 @@ const UI = (() => {
 
     // Vitesse affichée = vitesse SOL, vent compris (0 si l'avion est au sol)
     const airspeed = p.crashed ? 0 : CONFIG.speedForAlt(p.altitude) * State.speedMult(p);
-    const speed = p.crashed ? 0 : airspeed * Weather.factorFor(p.totalKm, p.altitude, Date.now(), airspeed);
+    const speed = p.crashed ? 0 : airspeed * Weather.factorFor(Routes.geo(p), p.altitude, Date.now(), airspeed);
     $('speed-value').textContent = fmt(speed);
+
+    // 🗺️ Route active : cap suivi et distance restante
+    refreshRouteChip(p);
 
     // Vent 🌬️ : badge + effets de scène (rafraîchis toutes les 5 s, pas à chaque tick)
     if (Date.now() - lastWindPaint > 5000) {
@@ -80,6 +83,49 @@ const UI = (() => {
     refreshScoreboard();
     Achievements.updateBadge();
     lastAlt = p.altitude;
+  }
+
+  /* ---------- Route active 🗺️ ---------- */
+
+  /** Bandeau de route sous la distance : LFPG ↔ ville, cap et km restants. */
+  function refreshRouteChip(p) {
+    const el = $('route-chip');
+    if (!el) return;
+    const g = Routes.geo(p);
+    const dest = g.outbound ? g.to : Routes.BASE;
+    const pend = Routes.pending(p);
+    const main = p.crashed
+      ? `<span class="rc-leg">💥 au sol à ${escapeHtml(Routes.BASE.icao)}</span>`
+      : `<span class="rc-leg">${g.outbound ? '→' : '←'} ${dest.icon || '📍'} ${escapeHtml(dest.city)}</span>
+         <span class="rc-km">${fmt(g.kmToNext)} km</span>`;
+    el.innerHTML =
+      `<span class="rc-route">${escapeHtml(g.route.label)}</span>${main}` +
+      (pend ? `<span class="rc-pending" title="Effectif au prochain passage à la verticale de ${escapeHtml(Routes.BASE.icao)}">⏳ ${escapeHtml(pend.icao)}</span>` : '');
+    el.title = `Route active : ${g.route.label} (${fmt(g.route.km)} km par trajet)`
+      + (pend ? ` — changement pour ${pend.label} au prochain passage à ${Routes.BASE.icao}.` : '');
+  }
+
+  /**
+   * Événements de vol renvoyés par Engine.simulate : arrivées, premières
+   * visites (prime de kérosène) et changement de route effectif.
+   */
+  function flightEvents(ev) {
+    if (!ev) return;
+    if (ev.switched) {
+      const r = Routes.byId(ev.switched);
+      if (r) toast(`🧭 Nouveau cap depuis ${Routes.BASE.icao} : <b>${r.label}</b> — direction ${r.icon} ${r.city} !`, 5200);
+      Weather.refresh(true);   // les relevés de vent suivent la nouvelle route
+    }
+    (ev.firstVisits || []).forEach((v, i) => {
+      const r = Routes.byCity(v.city);
+      setTimeout(() => {
+        toast(`${r ? r.icon : '📍'} PREMIÈRE VISITE : <b>${v.city}</b> ! ` +
+          `Prime de bienvenue : +${fmt(v.kero)} L de kérosène ⛽`, 6500);
+        const anchor = $('total-km') || $('hud-kero');
+        if (anchor) keroseneRain(anchor.getBoundingClientRect(), 10);
+        Achievements.updateBadge();
+      }, 400 + i * 900);
+    });
   }
 
   /* ---------- Série 🔥 ---------- */
@@ -168,7 +214,10 @@ const UI = (() => {
   /* ---------- Modales génériques ---------- */
 
   function openModal(id) { $(id).classList.add('open'); }
-  function closeModal(id) { $(id).classList.remove('open'); }
+  function closeModal(id) {
+    const el = $(id);
+    if (el) el.classList.remove('open');
+  }
 
   /* ---------- Modale activité ---------- */
 
@@ -370,8 +419,11 @@ const UI = (() => {
         lastDay = label;
       }
       const isAch = e.activityId === 'achievement';
+      const isDisco = e.activityId === 'discovery';
       const act = isAch
         ? { icon: e.achIcon || '🏆', name: `Succès « ${e.achName || '?'} »` }
+        : isDisco
+        ? { icon: e.cityIcon || '🛬', name: `Première visite : ${e.city || '?'}` }
         : CONFIG.ACTIVITIES.find(a => a.id === e.activityId) ||
           (CONFIG.LEGACY_ACTIVITIES || {})[e.activityId] ||
           { icon: '💪', name: e.activityId };
@@ -385,7 +437,7 @@ const UI = (() => {
         ? `${escapeHtml(act.name)}, ${e.minutes} min`
         : escapeHtml(act.name);
       // Série au moment de la séance (enregistrée depuis la v2.1)
-      const streakChip = (!isAch && e.streak > 1)
+      const streakChip = (!isAch && !isDisco && e.streak > 1)
         ? `<span class="j-streak" title="${e.streak}e jour d'affilée">🔥${e.streak}</span>` : '';
       html += `
         <div class="journal-row ${mine ? 'me' : ''}">
@@ -430,6 +482,8 @@ const UI = (() => {
         return shopItem(`${up.icon} ${up.name}`,
           up.desc + `<div class="level">Niveau ${level} / ${up.maxLevel}</div>`, '', btn);
       }).join('');
+    } else if (shopTab === 'routes') {
+      html = routesShopHtml(p);
     } else {
       html = CONFIG.DECORS.map(d => {
         const owned = p.ownedDecors.includes(d.id);
@@ -466,6 +520,86 @@ const UI = (() => {
         }
         refreshShop(); refreshHUD();
       }));
+    $('shop-content').querySelectorAll('[data-buy-route]').forEach(b =>
+      b.addEventListener('click', () => {
+        const res = Engine.buyRoute(p, b.dataset.buyRoute);
+        if (res.ok) {
+          toast(`🗺️ Route <b>${res.route.label}</b> ouverte ! Envoie ton avion vers ${res.route.icon} ${res.route.city}.`, 5200);
+          keroseneRain(b.getBoundingClientRect(), 4);
+        } else if (res.reason === 'points') {
+          toast('★ Pas assez de points pour ouvrir cette route.');
+        }
+        refreshShop(); refreshHUD();
+      }));
+    $('shop-content').querySelectorAll('[data-set-route]').forEach(b =>
+      b.addEventListener('click', () => {
+        const res = Engine.setRoute(p, b.dataset.setRoute);
+        if (res.ok && res.immediate && !res.already) {
+          toast(`🧭 Cap sur ${res.route.icon} ${res.route.city} — décollage de ${Routes.BASE.icao} !`, 5000);
+          Weather.refresh(true);
+        } else if (res.ok && !res.immediate) {
+          const eta = res.eta && res.eta.hours
+            ? ` (environ ${res.eta.hours < 1 ? Math.round(res.eta.hours * 60) + ' min' : res.eta.hours.toFixed(1).replace('.', ',') + ' h'}, ${fmt(res.eta.km)} km)`
+            : '';
+          toast(`⏳ Changement demandé : ton avion prendra la route <b>${res.route.label}</b> ` +
+            `au prochain passage à la verticale de ${Routes.BASE.icao}${eta}.`, 6500);
+        }
+        refreshShop(); refreshHUD();
+      }));
+    $('shop-content').querySelectorAll('[data-cancel-route]').forEach(b =>
+      b.addEventListener('click', () => {
+        Engine.cancelPendingRoute(p);
+        toast('↩️ Changement de route annulé : l\'avion garde son cap actuel.');
+        refreshShop(); refreshHUD();
+      }));
+  }
+
+  /* ---------- Boutique : onglet Routes 🗺️ ---------- */
+
+  function routesShopHtml(p) {
+    const groups = Routes.byRegion();
+    const pend = Routes.pending(p);
+    const g = Routes.geo(p);
+    const atBase = p.crashed || (g.outbound && g.legKm <= 1);
+
+    let head = `
+      <div class="shop-note">
+        🛫 Base : <b>${escapeHtml(Routes.BASE.name)} (${Routes.BASE.icao})</b>.
+        Ton avion fait des aller-retours sur la route active. Un changement de cap
+        ${atBase ? 'est immédiat (avion au sol)' : `sera effectif <b>au prochain passage à la verticale de ${Routes.BASE.icao}</b>`}.
+      </div>`;
+    if (pend) {
+      const eta = Engine.etaToBase(p);
+      head += `
+        <div class="shop-note pending">
+          ⏳ En attente : <b>${escapeHtml(pend.label)}</b>
+          ${eta.hours ? ` — retour à ${Routes.BASE.icao} dans ~${eta.hours < 1 ? Math.round(eta.hours * 60) + ' min' : eta.hours.toFixed(1).replace('.', ',') + ' h'} (${fmt(eta.km)} km)` : ''}
+          <button class="btn small ghost" data-cancel-route="1" type="button">Annuler</button>
+        </div>`;
+    }
+
+    const body = groups.map(grp => {
+      const items = grp.routes.map(r => {
+        const owned = Routes.isOwned(p, r.id);
+        const current = p.currentRoute === r.id;
+        const waiting = pend && pend.id === r.id;
+        const canBuy = State.availablePoints(p) >= r.cost;
+        const visited = Routes.hasVisited(p, r.city);
+        let btn;
+        if (current) btn = `<button class="btn small ghost" disabled type="button">En vol ✓</button>`;
+        else if (waiting) btn = `<button class="btn small ghost" disabled type="button">⏳ en attente</button>`;
+        else if (owned) btn = `<button class="btn small" data-set-route="${r.id}" type="button">Décoller</button>`;
+        else btn = `<button class="btn small warm" data-buy-route="${r.id}" ${canBuy ? '' : 'disabled'} type="button">★ ${fmt(r.cost)}</button>`;
+        const desc =
+          `${escapeHtml(r.icao)} · ${fmt(r.km)} km par trajet · ${fmt(r.km * 2)} km l'aller-retour` +
+          `<div class="level">${visited ? '✅ ville déjà visitée' : '🎁 première visite : prime de kérosène + succès'}</div>`;
+        return shopItem(`${r.icon} ${escapeHtml(r.city)}`, desc,
+          current ? 'owned-current' : '', btn);
+      }).join('');
+      return `<div class="shop-group">${escapeHtml(grp.region)}</div>${items}`;
+    }).join('');
+
+    return head + body;
   }
 
   function shopItem(name, desc, cls, btnHtml) {
@@ -498,8 +632,26 @@ const UI = (() => {
       : `${Math.round(sum.seconds / 60)} min`;
     if (sum.crashed) {
       toast(`💥 Pendant ton absence (${timeTxt}), ton avion a parcouru <b>${fmt(sum.km)} km</b>… ` +
-        `puis s'est <b>CRASHÉ</b> ! Fais du sport pour redécoller.`, 9000);
+        `puis s'est <b>CRASHÉ</b> ! Fais du sport pour redécoller depuis ${Routes.BASE.icao}.`, 9000);
       return;
+    }
+    // 🗺️ Escales atteintes pendant l'absence
+    const rt = sum.route || {};
+    let routeTxt = '';
+    const firsts = rt.firstVisits || [];
+    if (firsts.length) {
+      const names = firsts.map(v => {
+        const r = Routes.byCity(v.city);
+        return `${r ? r.icon + ' ' : ''}<b>${v.city}</b>`;
+      }).join(', ');
+      const kero = firsts.reduce((s, v) => s + (v.kero || 0), 0);
+      routeTxt = ` — découverte de ${names} : +${fmt(kero)} L de prime ⛽`;
+    } else if (rt.arrivals && rt.arrivals.length) {
+      routeTxt = ` — ${rt.arrivals.length} atterrissage(s) à destination 🛬`;
+    }
+    if (rt.switched) {
+      const r = Routes.byId(rt.switched);
+      if (r) routeTxt += ` — nouveau cap pris : <b>${r.label}</b> 🧭`;
     }
     const altTxt = Math.abs(sum.altDelta) < 100
       ? `a gardé une altitude stable ✈️`
@@ -514,7 +666,8 @@ const UI = (() => {
         ? ` — porté par un vent arrière (<b>+${p} %</b> de distance) 🌬️`
         : ` — malgré un vent de face (<b>−${p} %</b> de distance) 🌬️`;
     }
-    toast(`🛫 Pendant ton absence (${timeTxt}), ton avion a parcouru <b>${fmt(sum.km)} km</b> et ${altTxt}${windTxt}`, 7000);
+    toast(`🛫 Pendant ton absence (${timeTxt}), ton avion a parcouru <b>${fmt(sum.km)} km</b> et ${altTxt}${windTxt}${routeTxt}`,
+      routeTxt ? 9000 : 7000);
   }
 
   /* ---------- Écouteurs ---------- */
@@ -550,8 +703,14 @@ const UI = (() => {
     document.querySelectorAll('.shop-tab').forEach(tab =>
       tab.addEventListener('click', () => { shopTab = tab.dataset.tab; refreshShop(); }));
 
+    // Certaines croix (carte, détail d'un jour) n'ont pas de data-close et
+    // gèrent leur propre fermeture : on retombe alors sur la modale parente.
     document.querySelectorAll('.modal-close').forEach(btn =>
-      btn.addEventListener('click', () => closeModal(btn.dataset.close)));
+      btn.addEventListener('click', () => {
+        if (btn.dataset.close) { closeModal(btn.dataset.close); return; }
+        const bd = btn.closest('.modal-backdrop');
+        if (bd) bd.classList.remove('open');
+      }));
     document.querySelectorAll('.modal-backdrop').forEach(bd =>
       bd.addEventListener('click', (e) => { if (e.target === bd) bd.classList.remove('open'); }));
 
@@ -562,5 +721,6 @@ const UI = (() => {
     $('btn-switch-player').addEventListener('click', () => Auth.logout());
   }
 
-  return { bind, refreshHUD, toast, offlineSummary, keroseneRain, streakReminder };
+  return { bind, refreshHUD, refreshShop, toast, offlineSummary, keroseneRain,
+           streakReminder, flightEvents };
 })();

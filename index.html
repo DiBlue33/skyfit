@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkyFit — Fais du sport, garde ton avion en vol !</title>
-  <link rel="stylesheet" href="css/style.css?v=20260726a">
+  <link rel="stylesheet" href="css/style.css?v=20260726b">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>✈️</text></svg>">
 </head>
 <body>
@@ -33,6 +33,7 @@
     <h3>🌍 Distance parcourue</h3>
     <div class="km-value"><span id="total-km">0</span> <small>km</small></div>
     <div class="points-value">★ <span id="points">0</span> points</div>
+    <div class="route-chip" id="route-chip"></div>
     <div id="scoreboard"></div>
     <div class="top-buttons">
       <button class="btn ghost small" id="btn-achievements" type="button">🏆<span id="ach-badge"></span></button>
@@ -199,6 +200,7 @@
         <div class="shop-tabs">
           <button class="shop-tab active" data-tab="planes" type="button">✈️ Avions</button>
           <button class="shop-tab" data-tab="upgrades" type="button">⚙️ Améliorations</button>
+          <button class="shop-tab" data-tab="routes" type="button">🗺️ Routes</button>
           <button class="shop-tab" data-tab="decors" type="button">🌄 Décors</button>
         </div>
         <div id="shop-content"></div>
@@ -254,7 +256,7 @@
   <div class="modal-backdrop" id="modal-map">
     <div class="modal modal-map">
       <div class="modal-header">
-        <h2>🗺️ Tour du monde</h2>
+        <h2>🗺️ Carte du monde</h2>
         <button class="modal-close" type="button">✕</button>
       </div>
       <div class="modal-body">
@@ -343,22 +345,23 @@
   <!-- Toast -->
   <div id="toast"></div>
 
-  <script src="js/config.js?v=20260726a"></script>
-  <script src="js/state.js?v=20260726a"></script>
-  <script src="js/streak.js?v=20260726a"></script>
-  <script src="js/engine.js?v=20260726a"></script>
-  <script src="js/weather.js?v=20260726a"></script>
-  <script src="js/scene.js?v=20260726a"></script>
-  <script src="js/ui.js?v=20260726a"></script>
-  <script src="js/weather-ui.js?v=20260726a"></script>
-  <script src="js/stats.js?v=20260726a"></script>
-  <script src="js/worlddata.js?v=20260726a"></script>
-  <script src="js/map.js?v=20260726a"></script>
-  <script src="js/achievements.js?v=20260726a"></script>
-  <script src="js/sync-config.js?v=20260726a"></script>
-  <script src="js/sync.js?v=20260726a"></script>
-  <script src="js/auth.js?v=20260726a"></script>
-  <script src="js/admin.js?v=20260726a"></script>
-  <script src="js/main.js?v=20260726a"></script>
+  <script src="js/config.js?v=20260726b"></script>
+  <script src="js/routes.js?v=20260726b"></script>
+  <script src="js/state.js?v=20260726b"></script>
+  <script src="js/streak.js?v=20260726b"></script>
+  <script src="js/engine.js?v=20260726b"></script>
+  <script src="js/weather.js?v=20260726b"></script>
+  <script src="js/scene.js?v=20260726b"></script>
+  <script src="js/ui.js?v=20260726b"></script>
+  <script src="js/weather-ui.js?v=20260726b"></script>
+  <script src="js/stats.js?v=20260726b"></script>
+  <script src="js/worlddata.js?v=20260726b"></script>
+  <script src="js/map.js?v=20260726b"></script>
+  <script src="js/achievements.js?v=20260726b"></script>
+  <script src="js/sync-config.js?v=20260726b"></script>
+  <script src="js/sync.js?v=20260726b"></script>
+  <script src="js/auth.js?v=20260726b"></script>
+  <script src="js/admin.js?v=20260726b"></script>
+  <script src="js/main.js?v=20260726b"></script>
 </body>
 </html>
