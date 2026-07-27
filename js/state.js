@@ -44,6 +44,10 @@ const State = (() => {
       wheelLast: 0,                // horodatage du dernier tour (0 = jamais)
       wheelSpins: 0,               // nombre total de tours joués
       wheelJackpots: 0,            // nombre de jackpots décrochés
+      // Fiche de pilote 🎫 (v2.8)
+      avatar: '',                  // emoji choisi ('' = valeur par défaut selon le nom)
+      callsign: '',                // indicatif radio libre, ex. « SKY01 »
+      pinnedAchievements: [],      // 3 succès épinglés sur la vitrine
       claimedAchievements: {},     // id de succès -> date de réclamation
     };
   }
@@ -114,6 +118,13 @@ const State = (() => {
       if (typeof p.wheelLast !== 'number') p.wheelLast = 0;
       if (typeof p.wheelSpins !== 'number') p.wheelSpins = 0;
       if (typeof p.wheelJackpots !== 'number') p.wheelJackpots = 0;
+      // Fiche de pilote (v2.8) — champs plats + liste que Firebase peut vider
+      if (typeof p.avatar !== 'string') p.avatar = '';
+      if (typeof p.callsign !== 'string') p.callsign = '';
+      if (!Array.isArray(p.pinnedAchievements)) {
+        p.pinnedAchievements = p.pinnedAchievements ? Object.values(p.pinnedAchievements) : [];
+      }
+      p.pinnedAchievements = p.pinnedAchievements.filter(id => typeof id === 'string').slice(0, 3);
       // Réseau de routes (v2.3)
       migrateRoutes(p, routeIds);
       // Plafond propre à chaque avion (v2.6) : un profil qui volait au-dessus

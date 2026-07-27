@@ -196,6 +196,29 @@ const Auth = (() => {
     }
   }
 
+  /**
+   * Changement de code depuis la fiche de pilote (v2.8).
+   * Ne passe pas par le pavé de l'accueil : la partie reste en cours.
+   * Renvoie { ok: true } ou { ok: false, error: '…' }.
+   */
+  function changePin(oldPin, newPin, confirmPin) {
+    const p = State.current();
+    if (!p) return { ok: false, error: 'Aucun pilote connecté.' };
+    if (!/^[0-9]{4}$/.test(newPin)) {
+      return { ok: false, error: 'Le nouveau code doit contenir exactement 4 chiffres.' };
+    }
+    if (newPin !== confirmPin) {
+      return { ok: false, error: 'Les deux nouveaux codes ne correspondent pas.' };
+    }
+    if (p.pinHash && hashPin(p.name, oldPin) !== p.pinHash) {
+      return { ok: false, error: 'Code actuel incorrect.' };
+    }
+    p.pinHash = hashPin(p.name, newPin);
+    State.save(p);
+    Sync.push(p);
+    return { ok: true };
+  }
+
   function shake() {
     const card = document.querySelector('.home-card');
     card.classList.remove('shake');
@@ -252,5 +275,5 @@ const Auth = (() => {
 
   document.addEventListener('DOMContentLoaded', bind);
 
-  return { showHome, refreshHome, logout };
+  return { showHome, refreshHome, logout, changePin };
 })();

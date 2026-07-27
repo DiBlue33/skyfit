@@ -25,6 +25,12 @@ const UI = (() => {
     $('kero-fill').style.width = Math.min(100, (p.kerosene / cap) * 100) + '%';
     $('player-name').textContent = p.name;
 
+    // Bouton « fiche de pilote » : avatar choisi, sinon 👨‍✈️ / 👩‍✈️ par défaut
+    const av = $('btn-profile');
+    if (av) av.textContent = (typeof Profile !== 'undefined')
+      ? Profile.avatarOf(p)
+      : (p.avatar || '👨‍✈️');
+
     // Série de jours consécutifs 🔥
     refreshStreakBadge(p);
 
@@ -345,7 +351,7 @@ const UI = (() => {
 
   /**
    * Pluie de kérosène : des ⛽ s'envolent du point de départ vers la
-   * jauge de kérosène (en haut à gauche), puis la jauge « pulse ».
+   * jauge de kérosène (en bas à droite depuis la v2.8), puis la jauge « pulse ».
    */
   function keroseneRain(fromRect, count) {
     const target = $('hud-kero').getBoundingClientRect();
@@ -744,6 +750,9 @@ const UI = (() => {
 
     // Météo & vents 🌬️ (badge du HUD + panneau de prévisions)
     WeatherUI.bind();
+
+    // Fiche de pilote 🎫 (v2.8)
+    $('btn-profile').addEventListener('click', () => Profile.open());
 
     // Déconnexion : retour à l'écran d'accueil
     $('btn-switch-player').addEventListener('click', () => Auth.logout());

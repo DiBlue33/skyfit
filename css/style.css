@@ -155,27 +155,70 @@ button {
   margin-bottom: 6px;
 }
 
-/* Kérosène — haut gauche */
-#hud-kero { top: 16px; left: 16px; min-width: 220px; }
+/* Pilote — haut gauche (v2.8 : fiche + nom + déconnexion, rien de plus) */
+#hud-pilot {
+  top: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 10px;
+}
+
+.pilot-avatar {
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 5px 7px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pilot-avatar:hover {
+  transform: translateY(-1px) scale(1.06);
+  box-shadow: 0 4px 14px rgba(30, 50, 70, 0.18);
+}
+
+/* Kérosène — v2.8 : rapatrié en bas à droite, dans le bloc altitude,
+   pour ne plus masquer l'avion. Compact, sans position fixe propre. */
+#hud-kero {
+  width: 100%;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+
+.kero-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.kero-icon { font-size: 0.95rem; }
 
 .kero-bar {
-  height: 14px;
+  height: 8px;
   background: rgba(30, 50, 70, 0.12);
-  border-radius: 7px;
+  border-radius: 5px;
   overflow: hidden;
-  margin-top: 4px;
+  margin-top: 5px;
 }
 
 .kero-fill {
   height: 100%;
   width: 0%;
-  border-radius: 7px;
+  border-radius: 5px;
   background: linear-gradient(90deg, #f39c12, #f6c344);
   transition: width 0.6s ease;
 }
 
-.kero-value { font-size: 1.05rem; font-weight: 700; }
-.kero-value small { font-weight: 400; color: var(--text-soft); }
+.kero-value { font-size: 0.92rem; font-weight: 700; }
+.kero-head small { font-weight: 400; font-size: 0.72rem; color: var(--text-soft); }
 
 /* Stats — haut droite */
 #hud-stats { top: 16px; right: 16px; text-align: right; min-width: 230px; }
@@ -244,13 +287,15 @@ button {
 
 #hud-stats .top-buttons { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
 
-/* Altimètre — bas droite */
+/* Altimètre — bas droite. Depuis la v2.8 ce panneau réunit aussi la
+   réserve de kérosène et la série 🔥 : tout l'instrumental au même endroit. */
 #hud-alt {
   bottom: 16px; right: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 14px;
+  width: 186px;
 }
 
 .altimeter { position: relative; width: 130px; height: 130px; }
@@ -1383,12 +1428,17 @@ button {
 
 #toast.show { transform: translateX(-50%) translateY(0); }
 
-/* Joueur courant — badge */
+/* Joueur courant — badge (v2.8 : à droite du bouton fiche de pilote) */
 #current-player-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
   font-size: 0.8rem;
   color: var(--text-soft);
-  margin-top: 6px;
 }
+
+#current-player-badge #player-name { font-size: 0.95rem; color: var(--text); }
 
 #current-player-badge button {
   border: none; background: none;
@@ -1400,32 +1450,36 @@ button {
 
 /* ---------- Séries de jours consécutifs 🔥 ---------- */
 
-/* Pastille du HUD (sous la jauge de kérosène) */
+/* Pastille du HUD (sous la jauge de kérosène, en bas à droite depuis la v2.8) */
 #streak-badge {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
+  width: 100%;
   gap: 3px 6px;
   margin-top: 8px;
-  padding: 5px 9px;
+  padding: 5px 7px;
   border-radius: 10px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   line-height: 1.25;
+  box-sizing: border-box;
+  text-align: center;
   color: #a8500f;
   background: linear-gradient(120deg, rgba(243, 156, 18, 0.18), rgba(246, 195, 68, 0.10));
   border: 1px solid rgba(243, 156, 18, 0.38);
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-#streak-badge .sb-flame { font-size: 1rem; filter: saturate(1.2); }
+#streak-badge .sb-flame { font-size: 0.95rem; filter: saturate(1.2); }
 #streak-badge .sb-text { white-space: nowrap; }
-#streak-badge .sb-text b { font-size: 0.95rem; font-weight: 800; }
+#streak-badge .sb-text b { font-size: 0.92rem; font-weight: 800; }
 
-/* Libellés longs sur grand écran, abrégés sur téléphone */
-#streak-badge .sb-short { display: none; }
+/* v2.8 : la pastille vit dans la colonne étroite de droite — libellés courts partout */
+#streak-badge .sb-long { display: none; }
+#streak-badge .sb-short { display: inline; }
 
 #streak-badge .sb-mult {
-  margin-left: auto;
   font-weight: 800;
   color: var(--accent-warm);
   white-space: nowrap;
@@ -1586,16 +1640,23 @@ button {
   .hud { padding: 9px 11px; border-radius: 12px; }
   .hud h3 { font-size: 0.6rem; margin-bottom: 3px; }
 
-  /* Deux panneaux compacts côte à côte en haut */
-  #hud-kero {
+  /* Haut gauche : uniquement la fiche de pilote, compacte (v2.8) */
+  #hud-pilot {
     top: 8px; left: 8px;
-    width: calc(46% - 12px);
-    min-width: 0;
+    gap: 7px;
+    padding: 6px 10px 6px 7px;
   }
-  .kero-value { font-size: 0.9rem; }
-  .kero-bar { height: 10px; }
-  #current-player-badge { font-size: 0.68rem; margin-top: 4px; }
-  #current-player-badge button { font-size: 0.68rem; }
+  .pilot-avatar { font-size: 1.15rem; padding: 4px 5px; border-radius: 10px; }
+  #current-player-badge { font-size: 0.66rem; }
+  #current-player-badge #player-name { font-size: 0.78rem; }
+  #current-player-badge button { font-size: 0.66rem; }
+
+  /* Kérosène : compact, sous l'altimètre */
+  #hud-kero { margin-top: 7px; padding-top: 6px; }
+  .kero-value { font-size: 0.78rem; }
+  .kero-icon { font-size: 0.8rem; }
+  .kero-head small { font-size: 0.62rem; }
+  .kero-bar { height: 6px; margin-top: 4px; }
 
   /* Série 🔥 compacte */
   #streak-badge {
@@ -1606,12 +1667,9 @@ button {
   }
   #streak-badge .sb-flame { font-size: 0.82rem; }
   #streak-badge .sb-text b { font-size: 0.8rem; }
-  #streak-badge .sb-mult { font-size: 0.66rem; margin-left: auto; }
+  #streak-badge .sb-mult { font-size: 0.66rem; }
   #streak-badge .sb-warn { font-size: 0.6rem; }
   #streak-badge.off { font-size: 0.62rem; }
-  /* Sur téléphone : « 5 j » au lieu de « 5 jours d'affilée » */
-  #streak-badge .sb-long { display: none; }
-  #streak-badge .sb-short { display: inline; }
   .score-streak, .hsr-streak { font-size: 0.64rem; margin-left: 3px; }
 
   .streak-hero { padding: 11px 12px; gap: 10px; }
@@ -1645,7 +1703,7 @@ button {
 
   /* Altimètre compact, entièrement au-dessus de la barre du bas
      (celle-ci fait ~112 px : bouton Statistiques + ligne Ajouter une séance) */
-  #hud-alt { bottom: 126px; right: 8px; padding: 8px 10px; }
+  #hud-alt { bottom: 126px; right: 8px; padding: 8px 10px; width: 138px; }
   .altimeter { width: 86px; height: 86px; }
   .altimeter svg { width: 100%; height: 100%; }
   .alt-value { font-size: 0.9rem; }
@@ -1745,9 +1803,14 @@ button {
   transition: transform 0.8s ease;
 }
 
-#wind-badge .wb-main { flex: 1; white-space: nowrap; }
+#wind-badge .wb-main {
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 #wind-badge .wb-main b { font-weight: 800; }
-#wind-badge .wb-short { display: none; }
+/* v2.8 : le badge vit dans la colonne étroite de droite — libellés courts partout */
+#wind-badge .wb-long { display: none; }
+#wind-badge .wb-short { display: inline; }
 
 #wind-badge .wb-effect {
   flex: none;
@@ -1909,8 +1972,6 @@ button {
   #wind-badge { margin-top: 5px; padding: 4px 6px; font-size: 0.63rem; gap: 4px; }
   #wind-badge .wb-arrow { font-size: 0.8rem; }
   #wind-badge .wb-effect { font-size: 0.62rem; padding: 1px 4px; }
-  #wind-badge .wb-long { display: none; }
-  #wind-badge .wb-short { display: inline; }
 
   .wx-now { grid-template-columns: 1fr; gap: 7px; }
   .wx-card-value { font-size: 1rem; }
@@ -2059,4 +2120,380 @@ button {
   .wheel-stage { width: min(300px, 82vw); }
   .wheel-intro { font-size: 0.8rem; }
   .wheel-seg-label { font-size: 9px; }
+}
+
+/* ============================================================
+   Fiche de pilote 🎫 (v2.8)
+   ============================================================ */
+
+.modal-profile { width: min(600px, calc(100vw - 24px)); }
+
+.pf-h3 {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-soft);
+  margin: 20px 0 8px;
+}
+
+.pf-empty {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  font-style: italic;
+  padding: 8px 2px;
+}
+
+/* ---------- 1. Licence ---------- */
+
+.pf-licence {
+  border: 1px solid rgba(39, 174, 96, 0.35);
+  border-radius: 14px;
+  padding: 14px 15px;
+  background:
+    linear-gradient(135deg, rgba(39, 174, 96, 0.07), rgba(46, 134, 222, 0.07)),
+    repeating-linear-gradient(45deg,
+      rgba(39, 174, 96, 0.035) 0 8px, transparent 8px 16px);
+}
+
+.pf-lic-head { display: flex; align-items: center; gap: 12px; }
+
+.pf-lic-avatar {
+  font-size: 2.4rem;
+  line-height: 1;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--panel-border);
+}
+
+.pf-lic-id { flex: 1; min-width: 0; }
+
+.pf-lic-title {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-soft);
+}
+
+.pf-lic-name { font-size: 1.25rem; font-weight: 800; letter-spacing: -0.01em; }
+.pf-lic-call { font-size: 0.78rem; color: var(--accent); font-weight: 700; }
+
+.pf-lic-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 3px;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+  font-family: 'Courier New', monospace;
+}
+
+.pf-lic-grade { text-align: center; min-width: 82px; }
+.pf-grade-icon { font-size: 1.8rem; line-height: 1.1; }
+.pf-grade-name { font-size: 0.68rem; font-weight: 700; line-height: 1.2; }
+
+.pf-grade-stats {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.pf-grade-bar {
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 5px;
+  background: rgba(30, 50, 70, 0.12);
+  overflow: hidden;
+}
+
+.pf-grade-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #27ae60, #7bd48f);
+  transition: width 0.6s ease;
+}
+
+.pf-grade-next {
+  margin-top: 5px;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  line-height: 1.35;
+}
+
+.pf-stamps-title {
+  margin-top: 12px;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-soft);
+}
+
+.pf-stamps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 7px;
+  margin-top: 6px;
+}
+
+/* Tampon de passeport : encre verte, penché, un peu usé */
+.pf-stamp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.pf-stamp.got {
+  color: #1e8449;
+  border: 2px solid rgba(30, 132, 73, 0.6);
+  background: rgba(39, 174, 96, 0.08);
+  transform: rotate(-3deg);
+  opacity: 0.92;
+}
+
+.pf-stamp.got:nth-child(even) { transform: rotate(2.5deg); }
+.pf-stamp.got .st-mark { font-size: 0.85rem; }
+
+.pf-stamp.todo {
+  color: rgba(92, 113, 134, 0.6);
+  border: 2px dashed rgba(92, 113, 134, 0.3);
+  background: transparent;
+}
+
+/* ---------- 2. Chiffres clés ---------- */
+
+.pf-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.pf-fig {
+  padding: 9px 10px;
+  border-radius: 11px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.pf-fig-icon { font-size: 1rem; }
+.pf-fig-label { font-size: 0.66rem; color: var(--text-soft); line-height: 1.2; }
+.pf-fig-value { font-size: 1rem; font-weight: 800; margin-top: 2px; }
+
+/* ---------- 3. Carnet de vol ---------- */
+
+.pf-log-bar {
+  height: 9px;
+  border-radius: 5px;
+  background: rgba(30, 50, 70, 0.12);
+  overflow: hidden;
+}
+
+.pf-log-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, var(--accent), #7fc0f5);
+  transition: width 0.6s ease;
+}
+
+.pf-log-region {
+  margin: 12px 0 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-soft);
+}
+
+.pf-log-cities { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.pf-city {
+  font-size: 0.73rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  white-space: nowrap;
+}
+
+.pf-city.seen {
+  color: #1e8449;
+  border-color: rgba(30, 132, 73, 0.45);
+  background: rgba(39, 174, 96, 0.1);
+  font-weight: 700;
+}
+
+.pf-city.unseen { color: var(--text-soft); opacity: 0.62; }
+
+/* ---------- 4. Vitrine des succès ---------- */
+
+.pf-ach-sub {
+  margin: 11px 0 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.pf-ach-list { display: flex; flex-direction: column; gap: 6px; }
+
+.pf-ach {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  border-radius: 11px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.pf-ach.pinned {
+  border-color: rgba(230, 126, 34, 0.45);
+  background: rgba(230, 126, 34, 0.09);
+}
+
+.pf-ach-icon { font-size: 1.35rem; }
+.pf-ach-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pf-ach-body b { font-size: 0.85rem; }
+.pf-ach-body small { font-size: 0.68rem; color: var(--text-soft); }
+
+.pf-pin {
+  border: none;
+  background: none;
+  font-size: 1.05rem;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.pf-pin:hover { transform: scale(1.18); opacity: 1; }
+
+/* ---------- 5. Hangar ---------- */
+
+.pf-planes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.pf-plane {
+  padding: 9px 11px;
+  border-radius: 11px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.pf-plane.locked { opacity: 0.55; }
+
+.pf-plane.current {
+  border-color: rgba(46, 134, 222, 0.5);
+  background: rgba(46, 134, 222, 0.09);
+}
+
+.pf-plane-name { font-size: 0.86rem; font-weight: 700; }
+
+.pf-tag {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(46, 134, 222, 0.4);
+  border-radius: 999px;
+  padding: 1px 6px;
+  margin-left: 4px;
+}
+
+.pf-plane-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 9px;
+  margin-top: 3px;
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+
+.pf-decors { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.pf-decor {
+  font-size: 0.74rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+}
+
+.pf-decor.locked { opacity: 0.55; }
+
+.pf-decor.current {
+  border-color: rgba(46, 134, 222, 0.5);
+  background: rgba(46, 134, 222, 0.1);
+  font-weight: 700;
+}
+
+/* ---------- 6. Personnalisation ---------- */
+
+.pf-custom-label {
+  margin: 11px 0 5px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.pf-avatars { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.pf-av {
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 6px 8px;
+  border-radius: 11px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.pf-av:hover { transform: scale(1.12); }
+
+.pf-av.sel {
+  border-color: var(--accent);
+  background: rgba(46, 134, 222, 0.14);
+  box-shadow: 0 0 0 2px rgba(46, 134, 222, 0.22);
+}
+
+.pf-inline, .pf-pin-form { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.pf-inline input, .pf-pin-form input {
+  padding: 8px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.75);
+  font-size: 0.86rem;
+  color: var(--text);
+  font-family: inherit;
+  min-width: 0;
+}
+
+.pf-inline input { flex: 1; }
+.pf-pin-form input { width: 92px; text-align: center; letter-spacing: 0.2em; }
+
+.pf-msg { margin-top: 6px; font-size: 0.78rem; min-height: 1em; }
+.pf-msg.ok { color: var(--ok); }
+.pf-msg.err { color: var(--danger); }
+
+@media (max-width: 640px) {
+  .pf-lic-avatar { font-size: 1.9rem; padding: 6px; }
+  .pf-lic-name { font-size: 1.05rem; }
+  .pf-grade-icon { font-size: 1.4rem; }
+  .pf-lic-grade { min-width: 68px; }
+  .pf-stamps { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+  .pf-figures { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); }
+  .pf-fig-value { font-size: 0.88rem; }
+  .pf-planes { grid-template-columns: 1fr; }
+  .pf-pin-form input { width: 78px; }
 }

@@ -167,6 +167,23 @@ const CONFIG = {
     { id: 'aurora', name: 'Aurore boréale',    cost: 8000 },
   ],
 
+  // --- Grades de pilote 🎫 (v2.8) ---
+  // Un grade se gagne quand LES DEUX conditions sont remplies : assez
+  // d'heures de vol (dérivées des km à vie) ET assez de trajets terminés.
+  // Voler beaucoup sur une même ligne ne suffit donc pas : il faut aussi
+  // ouvrir des routes et se poser.
+  GRADE_REF_SPEED: 800,      // km/h de référence pour convertir les km en heures
+  GRADES: [
+    { id: 'eleve',      name: 'Élève-pilote',           icon: '🎓', hours: 0,    trips: 0 },
+    { id: 'prive',      name: 'Pilote privé',           icon: '🛩️', hours: 10,   trips: 2 },
+    { id: 'copi_jr',    name: 'Copilote junior',        icon: '🧑‍✈️', hours: 50,   trips: 10 },
+    { id: 'copi_conf',  name: 'Copilote confirmé',      icon: '✈️', hours: 150,  trips: 30 },
+    { id: 'cdb',        name: 'Commandant de bord',     icon: '🎖️', hours: 400,  trips: 75 },
+    { id: 'instructeur',name: 'Commandant instructeur', icon: '🏅', hours: 1000, trips: 150 },
+    { id: 'chef',       name: 'Chef pilote',            icon: '👑', hours: 2500, trips: 300 },
+    { id: 'legende',    name: 'Légende du ciel',        icon: '🌟', hours: 6000, trips: 600 },
+  ],
+
   // --- Simulation ---
   SIM_STEP_S: 60,            // pas de simulation hors-ligne (secondes)
   MAX_OFFLINE_DAYS: 60,      // au-delà, on plafonne la simulation
@@ -221,4 +238,38 @@ CONFIG.climbFtPerLitre = function (player) {
 /** Altitude de remise en vol après un crash (ft), arrondie à la centaine. */
 CONFIG.startAltFor = function (player) {
   return Math.round(CONFIG.ceilingFor(player) * CONFIG.ALT_START_RATIO / 100) * 100;
+};
+
+/* ------------------------------------------------------------
+   Grades de pilote 🎫 (v2.8)
+   ------------------------------------------------------------ */
+
+/** Heures de vol estimées : km à vie convertis à vitesse de référence. */
+CONFIG.flightHours = function (player) {
+  const km = (player && player.lifetimeKm) || 0;
+  return km / CONFIG.GRADE_REF_SPEED;
+};
+
+/** Nombre de trajets terminés (arrivées à destination). */
+CONFIG.tripsOf = function (player) {
+  return (player && player.landings) || 0;
+};
+
+/** Index du grade actuel dans CONFIG.GRADES (le plus haut atteint). */
+CONFIG.gradeIndex = function (player) {
+  const h = CONFIG.flightHours(player);
+  const t = CONFIG.tripsOf(player);
+  let idx = 0;
+  CONFIG.GRADES.forEach((g, i) => { if (h >= g.hours && t >= g.trips) idx = i; });
+  return idx;
+};
+
+/** Fiche du grade actuel. */
+CONFIG.gradeOf = function (player) {
+  return CONFIG.GRADES[CONFIG.gradeIndex(player)];
+};
+
+/** Fiche du grade suivant, ou null si le sommet est atteint. */
+CONFIG.nextGrade = function (player) {
+  return CONFIG.GRADES[CONFIG.gradeIndex(player) + 1] || null;
 };

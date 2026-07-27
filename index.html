@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkyFit — Fais du sport, garde ton avion en vol !</title>
-  <link rel="stylesheet" href="css/style.css?v=20260726g">
+  <link rel="stylesheet" href="css/style.css?v=20260727a">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>✈️</text></svg>">
 </head>
 <body>
@@ -16,14 +16,12 @@
     <div id="plane"></div>
   </div>
 
-  <!-- HUD : kérosène (haut gauche) -->
-  <div class="hud" id="hud-kero">
-    <h3>⛽ Réserve de kérosène</h3>
-    <div class="kero-value"><span id="kero-litres">0</span> L <small>/ <span id="kero-max">4000</span> L</small></div>
-    <div class="kero-bar"><div class="kero-fill" id="kero-fill"></div></div>
-    <div id="streak-badge" title="Série de jours consécutifs avec au moins une séance"></div>
+  <!-- HUD : pilote (haut gauche) — fiche, nom, déconnexion -->
+  <div class="hud" id="hud-pilot">
+    <button class="pilot-avatar" id="btn-profile" type="button"
+            title="Ouvrir ma fiche de pilote">👨‍✈️</button>
     <div id="current-player-badge">
-      Pilote : <b id="player-name">—</b>
+      <b id="player-name">—</b>
       <button id="btn-switch-player" type="button">déconnexion</button>
     </div>
   </div>
@@ -61,6 +59,17 @@
     <div class="speed-line">Vitesse : <b id="speed-value">250</b> km/h</div>
     <button id="wind-badge" type="button"
             title="Vent en altitude — cliquer pour voir la météo et les prévisions"></button>
+
+    <!-- Réserve de kérosène : rapatriée ici (v2.8) pour dégager l'avion -->
+    <div id="hud-kero" title="Réserve de kérosène">
+      <div class="kero-head">
+        <span class="kero-icon">⛽</span>
+        <span class="kero-value"><span id="kero-litres">0</span> L</span>
+        <small>/ <span id="kero-max">4000</span></small>
+      </div>
+      <div class="kero-bar"><div class="kero-fill" id="kero-fill"></div></div>
+    </div>
+    <div id="streak-badge" title="Série de jours consécutifs avec au moins une séance"></div>
   </div>
 
   <!-- HUD : statistiques + ajout d'activité (bas gauche) -->
@@ -235,6 +244,17 @@
     </div>
   </div>
 
+  <!-- Modale : fiche de pilote (v2.8) -->
+  <div class="modal-backdrop" id="modal-profile">
+    <div class="modal modal-profile">
+      <div class="modal-header">
+        <h2>🎫 Ma fiche de pilote</h2>
+        <button class="modal-close" data-close="modal-profile" type="button">✕</button>
+      </div>
+      <div class="modal-body" id="profile-body"></div>
+    </div>
+  </div>
+
   <!-- Modale : journal des activités -->
   <div class="modal-backdrop" id="modal-journal">
     <div class="modal">
@@ -367,24 +387,25 @@
   <!-- Toast -->
   <div id="toast"></div>
 
-  <script src="js/config.js?v=20260726g"></script>
-  <script src="js/routes.js?v=20260726g"></script>
-  <script src="js/state.js?v=20260726g"></script>
-  <script src="js/streak.js?v=20260726g"></script>
-  <script src="js/engine.js?v=20260726g"></script>
-  <script src="js/weather.js?v=20260726g"></script>
-  <script src="js/scene.js?v=20260726g"></script>
-  <script src="js/ui.js?v=20260726g"></script>
-  <script src="js/weather-ui.js?v=20260726g"></script>
-  <script src="js/stats.js?v=20260726g"></script>
-  <script src="js/worlddata.js?v=20260726g"></script>
-  <script src="js/map.js?v=20260726g"></script>
-  <script src="js/achievements.js?v=20260726g"></script>
-  <script src="js/wheel.js?v=20260726g"></script>
-  <script src="js/sync-config.js?v=20260726g"></script>
-  <script src="js/sync.js?v=20260726g"></script>
-  <script src="js/auth.js?v=20260726g"></script>
-  <script src="js/admin.js?v=20260726g"></script>
-  <script src="js/main.js?v=20260726g"></script>
+  <script src="js/config.js?v=20260727a"></script>
+  <script src="js/routes.js?v=20260727a"></script>
+  <script src="js/state.js?v=20260727a"></script>
+  <script src="js/streak.js?v=20260727a"></script>
+  <script src="js/engine.js?v=20260727a"></script>
+  <script src="js/weather.js?v=20260727a"></script>
+  <script src="js/scene.js?v=20260727a"></script>
+  <script src="js/ui.js?v=20260727a"></script>
+  <script src="js/weather-ui.js?v=20260727a"></script>
+  <script src="js/stats.js?v=20260727a"></script>
+  <script src="js/worlddata.js?v=20260727a"></script>
+  <script src="js/map.js?v=20260727a"></script>
+  <script src="js/achievements.js?v=20260727a"></script>
+  <script src="js/wheel.js?v=20260727a"></script>
+  <script src="js/profile.js?v=20260727a"></script>
+  <script src="js/sync-config.js?v=20260727a"></script>
+  <script src="js/sync.js?v=20260727a"></script>
+  <script src="js/auth.js?v=20260727a"></script>
+  <script src="js/admin.js?v=20260727a"></script>
+  <script src="js/main.js?v=20260727a"></script>
 </body>
 </html>
