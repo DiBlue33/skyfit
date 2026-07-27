@@ -193,6 +193,36 @@ const UI = (() => {
     setTimeout(() => el.classList.remove('pop'), 1200);
   }
 
+  /* ---------- Classement (haut droite) ---------- */
+
+  const SCORE_OPEN_KEY = 'skyfit.scoreOpen';
+
+  /**
+   * Le classement est repliable depuis la v2.9 : sur les écrans peu hauts
+   * il empiétait sur l'altimètre du bas. Le choix est mémorisé, et le
+   * bloc démarre replié quand la fenêtre est vraiment courte.
+   */
+  function scoreOpenDefault() {
+    const saved = localStorage.getItem(SCORE_OPEN_KEY);
+    if (saved !== null) return saved === '1';
+    return window.innerHeight > 700;
+  }
+
+  function setScoreOpen(open, remember) {
+    const block = $('score-block');
+    const btn = $('btn-score-toggle');
+    if (!block || !btn) return;
+    block.classList.toggle('collapsed', !open);
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (remember) localStorage.setItem(SCORE_OPEN_KEY, open ? '1' : '0');
+  }
+
+  function toggleScore() {
+    const block = $('score-block');
+    if (!block) return;
+    setScoreOpen(block.classList.contains('collapsed'), true);
+  }
+
   // Classement général : trié par record (meilleure tentative)
   function refreshScoreboard() {
     const me = State.current();
@@ -207,12 +237,23 @@ const UI = (() => {
         ? `<span class="score-streak ${s.pending ? 'pending' : ''}"
              title="${s.days} jours d'affilée">🔥${s.days}</span>` : '';
       return `
-      <div class="score-row ${me && p.name === me.name ? 'me' : ''}">
+      <div class="score-row ${me && p.name === me.name ? 'me' : ''}"
+           data-pilot="${escapeHtml(p.name)}" role="button" tabindex="0"
+           title="Voir la fiche de pilote de ${escapeHtml(p.name)}">
         <span><span class="medal">${medals[i] || '•'}</span>${escapeHtml(p.name)}${p.crashed ? ' 💥' : ''}${flame}</span>
         <span>${fmt(p.totalKm)} km
           <span class="score-record">🏆 ${fmt(record(p))}</span></span>
       </div>`;
     }).join('');
+
+    // v2.9 : un clic sur une ligne ouvre la fiche du pilote concerné.
+    $('scoreboard').querySelectorAll('[data-pilot]').forEach(row => {
+      const go = () => Profile.open(row.dataset.pilot);
+      row.addEventListener('click', go);
+      row.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+      });
+    });
   }
 
   function escapeHtml(s) {
@@ -754,10 +795,18 @@ const UI = (() => {
     // Fiche de pilote 🎫 (v2.8)
     $('btn-profile').addEventListener('click', () => Profile.open());
 
+    // Classement repliable (v2.9)
+    const scoreBtn = $('btn-score-toggle');
+    if (scoreBtn) {
+      scoreBtn.addEventListener('click', toggleScore);
+      setScoreOpen(scoreOpenDefault(), false);
+    }
+
     // Déconnexion : retour à l'écran d'accueil
     $('btn-switch-player').addEventListener('click', () => Auth.logout());
   }
 
   return { bind, refreshHUD, refreshShop, refreshScoreboard, toast,
-           offlineSummary, keroseneRain, streakReminder, flightEvents };
+           offlineSummary, keroseneRain, streakReminder, flightEvents,
+           setScoreOpen, toggleScore };
 })();

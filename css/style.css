@@ -265,14 +265,57 @@ button {
   50% { opacity: 0.55; }
 }
 
-#scoreboard { margin-top: 10px; border-top: 1px dashed var(--panel-border); padding-top: 8px; }
+/* Classement repliable (v2.9) — l'en-tête sert de bouton déroulant, ce qui
+   libère de la hauteur quand l'écran est court et que le panneau du bas
+   (altimètre + kérosène) remontait jusqu'à toucher celui-ci. */
+#score-block { margin-top: 10px; border-top: 1px dashed var(--panel-border); padding-top: 6px; }
+
+#btn-score-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  width: 100%;
+  padding: 2px 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+#btn-score-toggle:hover { color: var(--accent); }
+
+#btn-score-toggle .st-chevron {
+  display: inline-block;
+  font-size: 0.72rem;
+  transition: transform 0.18s ease;
+}
+
+#score-block.collapsed #btn-score-toggle .st-chevron { transform: rotate(-90deg); }
+#score-block.collapsed #scoreboard { display: none; }
+
+#scoreboard { margin-top: 4px; max-height: 26vh; overflow-y: auto; }
 
 .score-row {
   display: flex;
   justify-content: space-between;
   gap: 18px;
   font-size: 0.85rem;
-  padding: 2px 0;
+  padding: 2px 4px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.score-row:hover,
+.score-row:focus-visible {
+  background: rgba(41, 128, 185, 0.12);
+  outline: none;
 }
 
 .score-row .medal { margin-right: 4px; }
@@ -1634,6 +1677,101 @@ button {
 
 .gp-streak { color: var(--accent-warm); font-weight: 700; }
 
+/* ---------- Responsive en HAUTEUR (v2.9) ----------
+   Le panneau du bas droite (altimètre + kérosène + série) mesure ~328 px
+   et celui du haut droite ~260 px : sous 640 px de hauteur utile, les deux
+   se rencontraient. On rétrécit donc l'instrumental par paliers, en plus
+   du classement repliable. Ces règles ne s'appliquent qu'au-delà de
+   640 px de large : en dessous, le bloc téléphone plus bas prend la main. */
+
+@media (min-width: 641px) and (max-height: 820px) {
+  #hud-alt { padding: 10px; width: 168px; }
+  .altimeter { width: 108px; height: 108px; }
+  .altimeter svg { width: 100%; height: 100%; }
+  .alt-value { font-size: 1.05rem; }
+  .speed-line { font-size: 0.76rem; margin-top: 5px; }
+  #hud-kero { margin-top: 8px; padding-top: 7px; }
+  #streak-badge { margin-top: 6px; padding: 4px 6px; font-size: 0.7rem; }
+  #scoreboard { max-height: 22vh; }
+}
+
+@media (min-width: 641px) and (max-height: 700px) {
+  #hud-alt { bottom: 12px; right: 12px; padding: 8px 10px; width: 150px; }
+  .altimeter { width: 88px; height: 88px; }
+  .alt-value { font-size: 0.92rem; }
+  .alt-unit { font-size: 0.58rem; }
+  .alt-trend { font-size: 0.62rem; }
+  .speed-line { font-size: 0.7rem; margin-top: 4px; }
+  #hud-kero { margin-top: 6px; padding-top: 6px; }
+  .kero-value { font-size: 0.8rem; }
+  .kero-bar { height: 6px; margin-top: 4px; }
+  #streak-badge { margin-top: 5px; font-size: 0.66rem; }
+  #hud-stats { top: 12px; right: 12px; min-width: 200px; }
+  .km-value { font-size: 1.2rem; }
+  .points-value { font-size: 0.82rem; }
+  #scoreboard { max-height: 18vh; }
+}
+
+/* Écran très court (téléphone en paysage, fenêtre écrasée) : on va au plus
+   serré, l'altimètre perd son titre et le classement démarre replié. */
+@media (max-height: 520px) {
+  #hud-alt {
+    bottom: 8px; right: 8px; padding: 6px 8px; width: 132px;
+  }
+  #hud-alt h3 { display: none; }
+  .altimeter { width: 68px; height: 68px; }
+  .altimeter svg { width: 100%; height: 100%; }
+  .alt-value { font-size: 0.78rem; }
+  .alt-unit { font-size: 0.52rem; }
+  .alt-trend { font-size: 0.56rem; }
+  .speed-line { font-size: 0.64rem; margin-top: 3px; }
+  #hud-kero { margin-top: 5px; padding-top: 5px; }
+  .kero-value { font-size: 0.72rem; }
+  .kero-head small { display: none; }
+  .kero-bar { height: 5px; margin-top: 3px; }
+  #streak-badge { margin-top: 4px; padding: 3px 5px; font-size: 0.62rem; }
+  #wind-badge { margin-top: 5px; padding: 3px 6px; font-size: 0.62rem; }
+
+  #hud-stats { top: 8px; right: 8px; min-width: 0; width: 190px; padding: 8px 10px; }
+  .km-value { font-size: 1rem; }
+  .points-value { font-size: 0.74rem; }
+  .route-chip { font-size: 0.62rem; }
+  #scoreboard { max-height: 16vh; }
+  .score-row { font-size: 0.72rem; gap: 8px; }
+  #hud-stats .top-buttons { margin-top: 6px; flex-wrap: wrap; gap: 5px; }
+  #hud-stats .btn.small { padding: 5px 7px; font-size: 0.66rem; }
+}
+
+/* Palier extrême (~téléphone en paysage, 390 px de haut) : il n'y a la place
+   ni pour le titre du haut ni pour le bandeau de route. On élargit le panneau
+   haut pour que les quatre boutons tiennent sur une seule ligne. */
+@media (max-height: 440px) {
+  #hud-stats {
+    width: auto; max-width: 40vw; padding: 6px 9px;
+  }
+  #hud-stats h3 { display: none; }
+  #hud-stats .route-chip { display: none; }
+  #hud-stats .top-buttons { flex-wrap: nowrap; gap: 4px; margin-top: 5px; }
+  #hud-stats .btn.small { padding: 4px 6px; font-size: 0.62rem; white-space: nowrap; }
+  .km-value { font-size: 0.9rem; }
+  .points-value { font-size: 0.68rem; margin-top: 0; }
+  #score-block { margin-top: 5px; padding-top: 4px; }
+  #btn-score-toggle { font-size: 0.62rem; }
+  #scoreboard { max-height: 14vh; }
+
+  #hud-alt { width: 118px; padding: 5px 7px; }
+  .altimeter { width: 56px; height: 56px; }
+  .alt-value { font-size: 0.66rem; }
+  .alt-unit { display: none; }
+  .alt-trend { font-size: 0.5rem; }
+  .speed-line { font-size: 0.58rem; margin-top: 2px; }
+  #wind-badge { margin-top: 3px; padding: 2px 5px; font-size: 0.56rem; }
+  #hud-kero { margin-top: 3px; padding-top: 3px; }
+  .kero-value { font-size: 0.64rem; }
+  .kero-bar { height: 4px; margin-top: 2px; }
+  #streak-badge { margin-top: 3px; padding: 2px 4px; font-size: 0.56rem; }
+}
+
 /* ---------- Responsive (téléphones) ---------- */
 
 @media (max-width: 640px) {
@@ -2127,6 +2265,69 @@ button {
    ============================================================ */
 
 .modal-profile { width: min(600px, calc(100vw - 24px)); }
+
+/* ---------- 0. Onglets pilotes (v2.9) ---------- */
+
+.pf-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.pf-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px 7px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(30, 50, 70, 0.05);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.pf-tab:hover { border-color: var(--accent); color: var(--accent); }
+
+.pf-tab.sel {
+  background: rgba(41, 128, 185, 0.14);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.pf-tab-av { font-size: 1.15rem; line-height: 1; }
+
+.pf-tab-you {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(39, 174, 96, 0.18);
+  color: var(--ok);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* Bandeau « lecture seule » affiché sur la fiche de l'autre pilote */
+.pf-readonly {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(230, 126, 34, 0.12);
+  border: 1px solid rgba(230, 126, 34, 0.3);
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.pf-pin.static { opacity: 0.7; cursor: default; font-size: 0.9rem; }
 
 .pf-h3 {
   font-size: 0.74rem;

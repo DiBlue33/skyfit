@@ -1,5 +1,5 @@
 /* ============================================================
-   SkyFit — Fiche de pilote 🎫 (v2.8)
+   SkyFit — Fiche de pilote 🎫 (v2.8, croisée en v2.9)
    ------------------------------------------------------------
    Une page « passeport » qui rassemble tout ce qu'un pilote a
    accompli, en six blocs :
@@ -16,12 +16,34 @@
    Tout est recalculé à l'ouverture depuis l'état du joueur :
    rien de nouveau n'est stocké, sauf `avatar`, `callsign` et
    `pinnedAchievements` (champs plats, conservés par Firebase).
+
+   v2.9 — la fiche est désormais *croisée* : on peut consulter
+   celle de l'autre pilote via l'onglet en haut de la modale ou
+   en cliquant sur son nom dans le classement. Une fiche qui
+   n'est pas la sienne est strictement en lecture seule : ni
+   épinglage, ni avatar, ni indicatif, ni code PIN.
    ============================================================ */
 
 const Profile = (() => {
 
   const $ = (id) => document.getElementById(id);
   const fmt = (n) => Math.floor(n).toLocaleString('fr-FR');
+
+  /** Nom du pilote actuellement affiché dans la modale (null = moi). */
+  let viewedName = null;
+
+  /** Le pilote dont la fiche est à l'écran. */
+  function viewed() {
+    if (!viewedName) return State.current();
+    const found = State.allPlayers().find(p => p.name === viewedName);
+    return found || State.current();
+  }
+
+  /** Vrai si la fiche affichée est celle du joueur connecté. */
+  function isMine(p) {
+    const me = State.current();
+    return !!(me && p && me.name === p.name);
+  }
 
   /** Palette proposée dans la personnalisation. */
   const AVATAR_CHOICES = [
@@ -224,7 +246,12 @@ const Profile = (() => {
       .sort((a, b) => (claims[b.id] || 0) - (claims[a.id] || 0));
   }
 
-  function achCard(def, ts, pinned) {
+  /** `mine` : sur la fiche d'un autre pilote, pas de bouton d'épinglage. */
+  function achCard(def, ts, pinned, mine) {
+    const pin = mine
+      ? `<button class="pf-pin" data-pin="${def.id}" type="button"
+                 title="${pinned ? 'Retirer de la vitrine' : 'Épingler sur la vitrine'}">${pinned ? '📌' : '📍'}</button>`
+      : (pinned ? '<span class="pf-pin static">📌</span>' : '');
     return `
       <div class="pf-ach ${pinned ? 'pinned' : ''}">
         <span class="pf-ach-icon">${def.icon}</span>
@@ -232,8 +259,7 @@ const Profile = (() => {
           <b>${escapeHtml(def.name)}</b>
           <small>${ts ? dateFr(ts) : ''}</small>
         </span>
-        <button class="pf-pin" data-pin="${def.id}" type="button"
-                title="${pinned ? 'Retirer de la vitrine' : 'Épingler sur la vitrine'}">${pinned ? '📌' : '📍'}</button>
+        ${pin}
       </div>`;
   }
 
@@ -242,6 +268,7 @@ const Profile = (() => {
     const claimed = claimedList(p);
     const claims = p.claimedAchievements || {};
     const pins = (p.pinnedAchievements || []).filter(id => claims[id]);
+    const mine = isMine(p);
 
     const pinnedDefs = pins.map(id => all.find(d => d.id === id)).filter(Boolean);
     const recent = claimed.filter(d => !pins.includes(d.id)).slice(0, 3);
@@ -250,12 +277,14 @@ const Profile = (() => {
 
     html += '<div class="pf-ach-sub">📌 Épinglés (3 max)</div>';
     html += pinnedDefs.length
-      ? `<div class="pf-ach-list">${pinnedDefs.map(d => achCard(d, claims[d.id], true)).join('')}</div>`
-      : '<div class="pf-empty">Aucun succès épinglé — clique sur 📍 pour en mettre un en vitrine.</div>';
+      ? `<div class="pf-ach-list">${pinnedDefs.map(d => achCard(d, claims[d.id], true, mine)).join('')}</div>`
+      : (mine
+        ? '<div class="pf-empty">Aucun succès épinglé — clique sur 📍 pour en mettre un en vitrine.</div>'
+        : '<div class="pf-empty">Aucun succès épinglé sur cette vitrine.</div>');
 
     html += '<div class="pf-ach-sub">🕐 Derniers réclamés</div>';
     html += recent.length
-      ? `<div class="pf-ach-list">${recent.map(d => achCard(d, claims[d.id], false)).join('')}</div>`
+      ? `<div class="pf-ach-list">${recent.map(d => achCard(d, claims[d.id], false, mine)).join('')}</div>`
       : '<div class="pf-empty">Aucun succès réclamé pour l\'instant.</div>';
 
     return html;
@@ -264,7 +293,7 @@ const Profile = (() => {
   /** Épingle / désépingle un succès (3 au maximum, le plus ancien saute). */
   function togglePin(id) {
     const p = State.current();
-    if (!p) return;
+    if (!p || !isMine(viewed())) return;   // jamais sur la fiche d'un autre
     if (!Array.isArray(p.pinnedAchievements)) p.pinnedAchievements = [];
     const i = p.pinnedAchievements.indexOf(id);
     if (i >= 0) {
@@ -307,8 +336,9 @@ const Profile = (() => {
                 ${has ? '✅' : '🔒'} ${escapeHtml(d.name)}</span>`;
     }).join('');
 
+    const title = isMine(p) ? 'Mon hangar' : `Le hangar de ${escapeHtml(p.name)}`;
     return `
-      <h3 class="pf-h3">🏗️ Mon hangar — ${ownedP.length} / ${CONFIG.PLANES.length} appareils</h3>
+      <h3 class="pf-h3">🏗️ ${title} — ${ownedP.length} / ${CONFIG.PLANES.length} appareils</h3>
       <div class="pf-planes">${planes}</div>
       <div class="pf-log-region">Décors — ${ownedD.length} / ${CONFIG.DECORS.length}</div>
       <div class="pf-decors">${decors}</div>`;
@@ -347,21 +377,56 @@ const Profile = (() => {
   }
 
   /* ------------------------------------------------------------
+     Onglets pilotes (v2.9)
+     ------------------------------------------------------------
+     Une rangée d'onglets — un par pilote enregistré — permet de
+     passer de sa propre fiche à celle de l'autre sans quitter la
+     modale. Avec un seul pilote, la rangée disparaît.
+     ------------------------------------------------------------ */
+
+  function renderTabs(p) {
+    const players = State.allPlayers();
+    if (players.length < 2) return '';
+    const me = State.current();
+    return `
+      <div class="pf-tabs" id="pf-tabs">
+        ${players.map(q => `
+          <button class="pf-tab ${q.name === p.name ? 'sel' : ''}"
+                  data-pilot="${escapeHtml(q.name)}" type="button">
+            <span class="pf-tab-av">${avatarOf(q)}</span>
+            <span class="pf-tab-name">${escapeHtml(q.name)}</span>
+            ${me && q.name === me.name ? '<span class="pf-tab-you">moi</span>' : ''}
+          </button>`).join('')}
+      </div>`;
+  }
+
+  /* ------------------------------------------------------------
      Assemblage & interactions
      ------------------------------------------------------------ */
 
   function render() {
-    const p = State.current();
+    const p = viewed();
     const body = $('profile-body');
     if (!p || !body) return;
+    const mine = isMine(p);
+
+    const title = $('profile-title');
+    if (title) {
+      title.textContent = mine
+        ? '🎫 Ma fiche de pilote'
+        : `🎫 Fiche de pilote — ${p.name}`;
+    }
 
     body.innerHTML =
+      renderTabs(p) +
+      (mine ? '' : `<div class="pf-readonly">👀 Tu consultes la fiche de
+        <b>${escapeHtml(p.name)}</b> — lecture seule.</div>`) +
       renderLicence(p) +
       renderKeyFigures(p) +
       renderLogbook(p) +
       renderTrophies(p) +
       renderHangar(p) +
-      renderCustom(p);
+      (mine ? renderCustom(p) : '');
 
     bindBody();
   }
@@ -369,6 +434,13 @@ const Profile = (() => {
   function bindBody() {
     const body = $('profile-body');
     if (!body) return;
+
+    body.querySelectorAll('[data-pilot]').forEach(btn =>
+      btn.addEventListener('click', () => {
+        viewedName = btn.dataset.pilot;
+        render();
+        body.scrollTop = 0;
+      }));
 
     body.querySelectorAll('[data-pin]').forEach(btn =>
       btn.addEventListener('click', () => togglePin(btn.dataset.pin)));
@@ -413,11 +485,19 @@ const Profile = (() => {
     });
   }
 
-  function open() {
+  /**
+   * Ouvre la fiche. Sans argument : la mienne. Avec un nom de pilote
+   * (ou l'objet joueur) : la sienne, en lecture seule.
+   */
+  function open(who) {
+    const name = who && typeof who === 'object' ? who.name : who;
+    viewedName = name || null;
     render();
     const modal = $('modal-profile');
     if (modal) modal.classList.add('open');
+    const body = $('profile-body');
+    if (body) body.scrollTop = 0;
   }
 
-  return { open, render, avatarOf, licenceNumber, gradeProgress };
+  return { open, render, avatarOf, licenceNumber, gradeProgress, viewed, isMine };
 })();
