@@ -44,6 +44,19 @@ const State = (() => {
       wheelLast: 0,                // horodatage du dernier tour (0 = jamais)
       wheelSpins: 0,               // nombre total de tours joués
       wheelJackpots: 0,            // nombre de jackpots décrochés
+      // Quêtes 🎯 (v3.0) — champs plats + instantané du lundi
+      questWeek: 0,                // lundi 00:00 de la semaine armée (0 = jamais)
+      questClaimed: {},            // id de quête hebdo -> date de réclamation
+      chainStep: {},               // id de carrière -> nombre d'étapes réclamées
+      questAltMax: 0,              // plafond atteint depuis le début de la semaine
+      questsDone: 0,               // nombre total de quêtes accomplies
+      perfectWeeks: 0,             // semaines « 3 sur 3 » bouclées
+      qsKm: 0,                     // instantané du lundi : km à vie
+      qsLandings: 0,               //                       arrivées
+      qsBase: 0,                   //                       passages LFPG
+      qsSpent: 0,                  //                       points dépensés
+      qsRoutes: 0,                 //                       lignes possédées
+      qsUpg: 0,                    //                       niveaux d'améliorations
       // Fiche de pilote 🎫 (v2.8)
       avatar: '',                  // emoji choisi ('' = valeur par défaut selon le nom)
       callsign: '',                // indicatif radio libre, ex. « SKY01 »
@@ -118,6 +131,16 @@ const State = (() => {
       if (typeof p.wheelLast !== 'number') p.wheelLast = 0;
       if (typeof p.wheelSpins !== 'number') p.wheelSpins = 0;
       if (typeof p.wheelJackpots !== 'number') p.wheelJackpots = 0;
+      // Quêtes (v3.0) — Firebase supprime les objets vides : on les recrée
+      if (typeof p.questWeek !== 'number') p.questWeek = 0;
+      if (!p.questClaimed || typeof p.questClaimed !== 'object') p.questClaimed = {};
+      if (!p.chainStep || typeof p.chainStep !== 'object') p.chainStep = {};
+      if (typeof p.questAltMax !== 'number') p.questAltMax = 0;
+      if (typeof p.questsDone !== 'number') p.questsDone = 0;
+      if (typeof p.perfectWeeks !== 'number') p.perfectWeeks = 0;
+      ['qsKm', 'qsLandings', 'qsBase', 'qsSpent', 'qsRoutes', 'qsUpg'].forEach(k => {
+        if (typeof p[k] !== 'number' || !isFinite(p[k])) p[k] = 0;
+      });
       // Fiche de pilote (v2.8) — champs plats + liste que Firebase peut vider
       if (typeof p.avatar !== 'string') p.avatar = '';
       if (typeof p.callsign !== 'string') p.callsign = '';

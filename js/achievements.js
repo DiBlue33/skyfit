@@ -188,6 +188,70 @@ const Achievements = (() => {
       },
     );
 
+    // --- Quêtes 🎯 (v3.0) ---
+    const chainsDone = (p) => {
+      const map = (p.chainStep && typeof p.chainStep === 'object') ? p.chainStep : {};
+      return ((CONFIG.QUESTS && CONFIG.QUESTS.CHAINS) || [])
+        .filter(c => (Number(map[c.id]) || 0) >= c.steps.length).length;
+    };
+    const CHAIN_TOTAL = ((CONFIG.QUESTS && CONFIG.QUESTS.CHAINS) || []).length;
+
+    defs.push(
+      {
+        id: 'quest_first', group: 'Quêtes', icon: '🎯',
+        name: 'Premier contrat',
+        desc: 'Accomplir sa première quête',
+        reward: 75,
+        test: (p) => (p.questsDone || 0) >= 1,
+      },
+      {
+        id: 'quest_10', group: 'Quêtes', icon: '📋',
+        name: 'Carnet de missions',
+        desc: 'Accomplir 10 quêtes',
+        reward: 250,
+        test: (p) => (p.questsDone || 0) >= 10,
+        prog: (p) => [Math.min(p.questsDone || 0, 10), 10],
+      },
+      {
+        id: 'quest_50', group: 'Quêtes', icon: '🎖️',
+        name: 'Pilote de mission',
+        desc: 'Accomplir 50 quêtes',
+        reward: 900,
+        test: (p) => (p.questsDone || 0) >= 50,
+        prog: (p) => [Math.min(p.questsDone || 0, 50), 50],
+      },
+      {
+        id: 'quest_perfect', group: 'Quêtes', icon: '💯',
+        name: 'Sans faute',
+        desc: 'Boucler les 3 quêtes d\'une même semaine',
+        reward: 400,
+        test: (p) => (p.perfectWeeks || 0) >= 1,
+      },
+      {
+        id: 'quest_perfect_5', group: 'Quêtes', icon: '🏵️',
+        name: 'Régularité exemplaire',
+        desc: 'Boucler 5 semaines parfaites',
+        reward: 1200,
+        test: (p) => (p.perfectWeeks || 0) >= 5,
+        prog: (p) => [Math.min(p.perfectWeeks || 0, 5), 5],
+      },
+      {
+        id: 'chain_first', group: 'Quêtes', icon: '🧗',
+        name: 'Première carrière',
+        desc: 'Terminer une chaîne de quêtes permanentes',
+        reward: 800,
+        test: (p) => chainsDone(p) >= 1,
+      },
+      {
+        id: 'chain_all', group: 'Quêtes', icon: '👑',
+        name: 'Toutes les carrières',
+        desc: `Terminer les ${CHAIN_TOTAL} chaînes de quêtes permanentes`,
+        reward: 3000,
+        test: (p) => CHAIN_TOTAL > 0 && chainsDone(p) >= CHAIN_TOTAL,
+        prog: (p) => [chainsDone(p), CHAIN_TOTAL],
+      },
+    );
+
     // --- Divers ---
     defs.push(
       {
@@ -302,7 +366,7 @@ const Achievements = (() => {
     if (!p) return;
 
     const groups = VOYAGE_GROUPS.concat(
-      ['Réseau', 'Assiduité', 'Séries', 'Flotte', 'Décors', 'Chance', 'Divers']);
+      ['Réseau', 'Assiduité', 'Séries', 'Quêtes', 'Flotte', 'Décors', 'Chance', 'Divers']);
     const all = defs();
     const claimed = all.filter(d => status(p, d) === 'claimed').length;
     $('ach-summary').textContent =

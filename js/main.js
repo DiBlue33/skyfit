@@ -58,9 +58,12 @@ const Main = (() => {
     Scene.setDecor(p.currentDecor);
     UI.refreshHUD();
 
+    Quests.refresh(true);  // 🎯 arme la semaine et solde les quêtes en attente
+
     if (summary) UI.offlineSummary(summary);
     UI.streakReminder();   // 🔥 rappel si la série est en sursis
     Wheel.reminder();      // 🎡 rappel si le tour du jour est disponible
+    Quests.reminder();     // 🎯 rappel si des récompenses attendent
 
     startLoop();
   }
@@ -72,6 +75,7 @@ const Main = (() => {
       if (!p) return;
       const res = Engine.simulate(p, (Date.now() - p.lastTick) / 1000);
       UI.refreshHUD();
+      Quests.refresh();   // 🎯 plafond de la semaine, bascule du lundi, pastille
       if (res && res.route) UI.flightEvents(res.route);   // 🛬 arrivées & changements de cap
     }, CONFIG.TICK_MS);
 

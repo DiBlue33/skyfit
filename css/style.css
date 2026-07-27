@@ -1841,7 +1841,7 @@ button {
 
   /* Altimètre compact, entièrement au-dessus de la barre du bas
      (celle-ci fait ~112 px : bouton Statistiques + ligne Ajouter une séance) */
-  #hud-alt { bottom: 126px; right: 8px; padding: 8px 10px; width: 138px; }
+  #hud-alt { bottom: 118px; right: 8px; padding: 8px 10px; width: 138px; }
   .altimeter { width: 86px; height: 86px; }
   .altimeter svg { width: 100%; height: 100%; }
   .alt-value { font-size: 0.9rem; }
@@ -1854,7 +1854,13 @@ button {
     bottom: 8px; left: 8px; right: 8px;
     padding: 8px;
   }
-  #btn-add-activity { flex: 1; padding: 12px 10px; font-size: 0.92rem; }
+  /* Le libellé doit tenir sur UNE ligne malgré les 3 boutons ronds
+     (➕ 🎯 🎡 🔧) : sinon la barre grandit et rattrape l'altimètre. */
+  #btn-add-activity {
+    flex: 1; min-width: 0; padding: 12px 6px; font-size: 0.82rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .activity-row { gap: 6px; }
 
   /* Avion un peu plus petit pour laisser de la place au HUD */
   #plane { left: 4%; }
@@ -2254,7 +2260,7 @@ button {
 
 @media (max-width: 640px) {
   /* La barre du bas gagne un bouton : l'altimètre reste au-dessus */
-  #btn-wheel { padding: 12px 9px; }
+  #btn-wheel, #btn-quests { padding: 12px 9px; }
   .wheel-stage { width: min(300px, 82vw); }
   .wheel-intro { font-size: 0.8rem; }
   .wheel-seg-label { font-size: 9px; }
@@ -2697,4 +2703,197 @@ button {
   .pf-fig-value { font-size: 0.88rem; }
   .pf-planes { grid-template-columns: 1fr; }
   .pf-pin-form input { width: 78px; }
+}
+
+/* ============================================================
+   Quêtes 🎯 (v3.0)
+   ============================================================ */
+
+/* Même gabarit que le bouton de la roue, juste à côté */
+#btn-quests { position: relative; font-size: 1.05rem; line-height: 1; }
+#btn-quests.ready {
+  border-color: rgba(243, 156, 18, 0.85);
+  box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.25);
+}
+
+#quest-badge {
+  display: none;
+  position: absolute;
+  top: -7px; right: -7px;
+  min-width: 18px; height: 18px;
+  align-items: center;
+  justify-content: center;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  border-radius: 9px;
+  padding: 0 4px;
+  box-shadow: 0 2px 6px rgba(180, 40, 30, 0.5);
+}
+
+.modal-quests { width: min(580px, calc(100vw - 24px)); }
+
+.q-section { margin-bottom: 22px; }
+.q-section:last-child { margin-bottom: 4px; }
+
+.q-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+  margin-bottom: 6px;
+}
+
+.q-timer {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+  font-size: 0.74rem;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.q-hint {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+  margin: 0 0 10px;
+}
+
+.q-card {
+  border: 1px solid rgba(30, 50, 70, 0.13);
+  border-radius: 14px;
+  padding: 11px 13px;
+  margin-bottom: 10px;
+  background: #fbfdff;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.q-card.ready {
+  border-color: rgba(230, 126, 34, 0.55);
+  background: rgba(243, 156, 18, 0.10);
+}
+
+.q-card.claimed, .q-card.complete { opacity: 0.62; }
+
+.q-card.bonus { background: rgba(46, 134, 222, 0.07); }
+.q-card.bonus.ready { background: rgba(243, 156, 18, 0.12); }
+
+.q-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.q-icon { font-size: 1.35rem; line-height: 1.2; flex: none; }
+
+.q-title { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+
+.q-name { font-weight: 700; font-size: 0.92rem; }
+
+.q-desc { font-size: 0.78rem; color: var(--text-soft); line-height: 1.35; }
+
+.q-tier, .q-step {
+  flex: none;
+  align-self: flex-start;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--tier, #7f8c8d);
+  white-space: nowrap;
+}
+
+.q-step { background: rgba(30, 50, 70, 0.35); }
+
+.q-prog {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 9px;
+}
+
+.q-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 5px;
+  background: rgba(30, 50, 70, 0.12);
+  overflow: hidden;
+}
+
+.q-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #2e86de, #27ae60);
+  transition: width 0.4s ease;
+}
+
+.q-bar.rival { height: 5px; }
+.q-bar.rival .q-bar-fill { background: linear-gradient(90deg, #d980b5, #c2559a); }
+
+.q-val {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  white-space: nowrap;
+  flex: none;
+}
+
+.q-rival {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-left: 2px;
+}
+
+.q-rival-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  flex: none;
+  min-width: 54px;
+}
+
+.q-rival-val {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  flex: none;
+  white-space: nowrap;
+}
+
+.q-rival.ok .q-rival-val { color: var(--ok); }
+
+.q-foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.q-reward {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.q-done {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ok);
+}
+
+@media (max-width: 560px) {
+  .q-tier { display: none; }
+  .q-rival-name { min-width: 44px; }
 }

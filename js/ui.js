@@ -472,13 +472,16 @@ const UI = (() => {
       const isAch = e.activityId === 'achievement';
       const isDisco = e.activityId === 'discovery';
       const isWheel = e.activityId === 'wheel';
-      const isMeta = isAch || isDisco || isWheel;
+      const isQuest = e.activityId === 'quest';
+      const isMeta = isAch || isDisco || isWheel || isQuest;
       const act = isAch
         ? { icon: e.achIcon || '🏆', name: `Succès « ${e.achName || '?'} »` }
         : isDisco
         ? { icon: e.cityIcon || '🛬', name: `Première visite : ${e.city || '?'}` }
         : isWheel
         ? { icon: e.prizeIcon || '🎡', name: `Roue de la chance — ${e.prizeLabel || '?'}` }
+        : isQuest
+        ? { icon: e.questIcon || '🎯', name: `Quête « ${e.questName || '?'} »` }
         : CONFIG.ACTIVITIES.find(a => a.id === e.activityId) ||
           (CONFIG.LEGACY_ACTIVITIES || {})[e.activityId] ||
           { icon: '💪', name: e.activityId };
