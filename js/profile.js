@@ -51,6 +51,39 @@ const Profile = (() => {
     '🐱', '🐼', '🚀', '🛸', '⭐', '🌙', '🎩', '🥽',
   ];
 
+  /**
+   * Photos de profil découpées (v3.2).
+   *
+   * Un avatar photo est stocké comme un jeton « photo:<id> » dans
+   * `player.avatar` — donc une chaîne plate, synchronisée par Firebase sans
+   * une ligne de code, exactement comme les avatars emoji.
+   * Les PNG sont déjà détourés en rond avec leur contour blanc : aucune bordure
+   * CSS à ajouter, sinon elle doublerait le liseré.
+   */
+  const PHOTO_AVATARS = [
+    { id: 'photo:diego', name: 'Diego', src: 'assets/avatars/diego.png' },
+    { id: 'photo:jade',  name: 'Jade',  src: 'assets/avatars/jade.png'  },
+  ];
+
+  function photoOf(token) {
+    return PHOTO_AVATARS.find(a => a.id === token) || null;
+  }
+
+  /**
+   * Rend un avatar pour l'insertion dans du HTML : soit l'emoji tel quel, soit
+   * une balise <img> dimensionnée en `em` (elle suit donc la taille de police
+   * du contexte — grande sur la licence, minuscule dans les onglets).
+   * `onerror` masque l'image si le PNG manque : un déploiement partiel ne doit
+   * pas laisser une icône cassée dans le HUD.
+   */
+  function avatarHtml(p, cls) {
+    const token = avatarOf(p);
+    const ph = photoOf(token);
+    if (!ph) return token;
+    return `<img class="av-photo ${cls || ''}" src="${ph.src}" alt="${escapeHtml(ph.name)}"
+                 title="${escapeHtml(ph.name)}" onerror="this.style.display='none'">`;
+  }
+
   function normalize(s) {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   }
@@ -149,7 +182,7 @@ const Profile = (() => {
     return `
       <div class="pf-licence">
         <div class="pf-lic-head">
-          <div class="pf-lic-avatar">${avatarOf(p)}</div>
+          <div class="pf-lic-avatar">${avatarHtml(p)}</div>
           <div class="pf-lic-id">
             <div class="pf-lic-title">Licence de pilote de ligne</div>
             <div class="pf-lic-name">${escapeHtml(p.name)}</div>
@@ -357,9 +390,20 @@ const Profile = (() => {
       `<button class="pf-av ${e === cur ? 'sel' : ''}" data-avatar="${e}" type="button">${e}</button>`
     ).join('');
 
+    // Les photos passent en premier : ce sont les avatars « pour de vrai ».
+    const photos = PHOTO_AVATARS.map(a =>
+      `<button class="pf-av pf-av-photo ${a.id === cur ? 'sel' : ''}"
+               data-avatar="${a.id}" type="button" title="${escapeHtml(a.name)}">
+         <img src="${a.src}" alt="${escapeHtml(a.name)}"
+              onerror="this.closest('button').style.display='none'">
+       </button>`
+    ).join('');
+
     return `
       <h3 class="pf-h3">🎨 Personnalisation</h3>
-      <div class="pf-custom-label">Avatar affiché dans le HUD</div>
+      <div class="pf-custom-label">Photo de profil</div>
+      <div class="pf-avatars pf-photos">${photos}</div>
+      <div class="pf-custom-label">…ou un avatar dessiné</div>
       <div class="pf-avatars">${choices}</div>
 
       <div class="pf-custom-label">Indicatif radio (facultatif, 8 caractères max)</div>
@@ -396,7 +440,7 @@ const Profile = (() => {
         ${players.map(q => `
           <button class="pf-tab ${q.name === p.name ? 'sel' : ''}"
                   data-pilot="${escapeHtml(q.name)}" type="button">
-            <span class="pf-tab-av">${avatarOf(q)}</span>
+            <span class="pf-tab-av">${avatarHtml(q)}</span>
             <span class="pf-tab-name">${escapeHtml(q.name)}</span>
             ${me && q.name === me.name ? '<span class="pf-tab-you">moi</span>' : ''}
           </button>`).join('')}
@@ -502,5 +546,6 @@ const Profile = (() => {
     if (body) body.scrollTop = 0;
   }
 
-  return { open, render, avatarOf, licenceNumber, gradeProgress, viewed, isMine };
+  return { open, render, avatarOf, avatarHtml, PHOTO_AVATARS,
+           licenceNumber, gradeProgress, viewed, isMine };
 })();

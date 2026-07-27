@@ -26,10 +26,16 @@ const UI = (() => {
     $('player-name').textContent = p.name;
 
     // Bouton « fiche de pilote » : avatar choisi, sinon 👨‍✈️ / 👩‍✈️ par défaut
+    // Depuis la v3.2 l'avatar peut être une photo découpée : on passe donc par
+    // Profile.avatarHtml(), qui renvoie soit l'emoji, soit une balise <img>.
     const av = $('btn-profile');
-    if (av) av.textContent = (typeof Profile !== 'undefined')
-      ? Profile.avatarOf(p)
-      : (p.avatar || '👨‍✈️');
+    if (av) {
+      if (typeof Profile !== 'undefined' && Profile.avatarHtml) {
+        av.innerHTML = Profile.avatarHtml(p);
+      } else {
+        av.textContent = p.avatar || '👨‍✈️';
+      }
+    }
 
     // Série de jours consécutifs 🔥
     refreshStreakBadge(p);

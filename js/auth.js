@@ -87,9 +87,13 @@ const Auth = (() => {
   function refreshProfileList() {
     const players = State.allPlayers().slice()
       .sort((a, b) => Math.max(b.bestKm, b.totalKm) - Math.max(a.bestKm, a.totalKm));
+    // v3.2 : chaque pilote montre son propre avatar (emoji ou photo découpée)
+    // au lieu du 👨‍✈️ codé en dur, qui s'appliquait même à Jade.
+    const av = (p) => (typeof Profile !== 'undefined' && Profile.avatarHtml)
+      ? Profile.avatarHtml(p) : '👨‍✈️';
     $('home-profile-list').innerHTML = players.map(p => `
       <button class="player-btn" data-player="${escapeHtml(p.name)}" type="button">
-        <span>👨‍✈️ ${escapeHtml(p.name)}</span>
+        <span>${av(p)} ${escapeHtml(p.name)}</span>
         <span class="pkm">${p.pinHash ? '🔒' : '🔓 code à créer'}</span>
       </button>`).join('');
     document.querySelectorAll('#home-profile-list .player-btn').forEach(btn =>
