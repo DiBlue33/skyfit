@@ -313,7 +313,7 @@ const Profile = (() => {
 
   function renderHangar(p) {
     const ownedP = p.ownedPlanes || [];
-    const ownedD = p.ownedDecors || [];
+    const seenPh = p.seenPhenomena || [];
 
     const planes = CONFIG.PLANES.map(pl => {
       const has = ownedP.includes(pl.id);
@@ -329,19 +329,22 @@ const Profile = (() => {
         </div>`;
     }).join('');
 
-    const decors = CONFIG.DECORS.map(d => {
-      const has = ownedD.includes(d.id);
-      const cur = d.id === p.currentDecor;
-      return `<span class="pf-decor ${has ? 'owned' : 'locked'} ${cur ? 'current' : ''}">
-                ${has ? '✅' : '🔒'} ${escapeHtml(d.name)}</span>`;
+    // Depuis la v3.1 la vitrine ne montre plus des décors achetés mais les
+    // phénomènes célestes réellement observés en vol.
+    const phList = (typeof Sky !== 'undefined' && Sky.PHENOMENA) ? Sky.PHENOMENA : [];
+    const phenos = phList.map(ph => {
+      const has = seenPh.includes(ph.id);
+      return `<span class="pf-decor ${has ? 'owned' : 'locked'}"
+                    title="${escapeHtml(ph.hint || '')}">
+                ${has ? ph.icon : '🔒'} ${escapeHtml(ph.name)}</span>`;
     }).join('');
 
     const title = isMine(p) ? 'Mon hangar' : `Le hangar de ${escapeHtml(p.name)}`;
     return `
       <h3 class="pf-h3">🏗️ ${title} — ${ownedP.length} / ${CONFIG.PLANES.length} appareils</h3>
       <div class="pf-planes">${planes}</div>
-      <div class="pf-log-region">Décors — ${ownedD.length} / ${CONFIG.DECORS.length}</div>
-      <div class="pf-decors">${decors}</div>`;
+      <div class="pf-log-region">Phénomènes observés — ${seenPh.length} / ${phList.length}</div>
+      <div class="pf-decors">${phenos}</div>`;
   }
 
   /* ------------------------------------------------------------

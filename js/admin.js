@@ -100,7 +100,6 @@ const Admin = (() => {
 
       case 'unlock-all':
         p.ownedPlanes = CONFIG.PLANES.map(pl => pl.id);
-        p.ownedDecors = CONFIG.DECORS.map(d => d.id);
         CONFIG.UPGRADES.forEach(u => { p.upgrades[u.id] = u.maxLevel; });
         UI.toast('🔧 Tout est débloqué !');
         break;
@@ -129,14 +128,13 @@ const Admin = (() => {
           totalKm: 0, bestKm: 0, lifetimeKm: 0,
           points: 0, pointsSpent: 0, bonusPoints: 0,
           ownedPlanes: ['cessna'], currentPlane: 'cessna',
-          ownedDecors: ['day'], currentDecor: 'day',
           upgrades: { yield: 0, aero: 0, tank: 0 },
+          seenPhenomena: [],
           activityLog: [], totalSportMinutes: 0,
           totalSessions: 0, maxAltitude: CONFIG.startAltFor({ currentPlane: 'cessna' }),
           claimedAchievements: {},
         });
         Scene.setPlane(p.currentPlane);
-        Scene.setDecor(p.currentDecor);
         Scene.setCondition(false, false);
         UI.toast('🔧 Pilote réinitialisé');
         break;

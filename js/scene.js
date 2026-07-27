@@ -4,18 +4,15 @@
 
 const Scene = (() => {
 
-  // --- Dégradés de ciel par décor ---
-  const DECOR_STYLES = {
-    day:    { top: '#4aa3e8', bottom: '#bfe3ff', cloud: '#ffffff', stars: false },
-    sunset: { top: '#6a4c93', bottom: '#ffb677', cloud: '#ffd9c0', stars: false },
-    night:  { top: '#0b1d3a', bottom: '#27406b', cloud: '#9fb4d8', stars: true  },
-    aurora: { top: '#03121f', bottom: '#0e4d4a', cloud: '#a8d8cf', stars: true  },
-  };
+  // Depuis la v3.1 le ciel ne vient plus d'un décor acheté mais de la
+  // situation réelle de vol : c'est Sky.state() qui produit les couleurs,
+  // et applySky() ci-dessous se contente de les poser sur le DOM.
 
   // Les avions sont des images détourées (assets/planes/<id>.png),
   // générées par scripts/process_assets.py à partir des sources.
 
   let cloudLayer, plane, skyEl, starsEl;
+  let sunEl = null, horizonEl = null;
   let cloudSeed = 0;
 
   function init() {
@@ -58,23 +55,88 @@ const Scene = (() => {
     }
   }
 
-  function setDecor(decorId) {
-    const st = DECOR_STYLES[decorId] || DECOR_STYLES.day;
-    skyEl.style.setProperty('--sky-top', st.top);
-    skyEl.style.setProperty('--sky-bottom', st.bottom);
-    skyEl.style.setProperty('--cloud-color', st.cloud);
-    skyEl.classList.toggle('decor-aurora', decorId === 'aurora');
-    starsEl.style.display = st.stars ? 'block' : 'none';
-    if (st.stars && !starsEl.hasChildNodes()) {
-      for (let i = 0; i < 60; i++) {
-        const s = document.createElement('div');
-        s.className = 'star';
-        s.style.left = Math.random() * 100 + '%';
-        s.style.top = Math.random() * 100 + '%';
-        s.style.animationDelay = (Math.random() * 4) + 's';
-        starsEl.appendChild(s);
+  /* Les étoiles sont créées une seule fois puis pilotées en opacité :
+     les recréer à chaque rafraîchissement ferait scintiller tout le champ
+     d'un coup, et coûterait 60 nœuds DOM plusieurs fois par seconde. */
+  function ensureStars() {
+    if (!starsEl || starsEl.hasChildNodes()) return;
+    for (let i = 0; i < 60; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      s.style.left = Math.random() * 100 + '%';
+      s.style.top = Math.random() * 100 + '%';
+      s.style.animationDelay = (Math.random() * 4) + 's';
+      starsEl.appendChild(s);
+    }
+  }
+
+  /* Disque solaire / lunaire : un seul élément, recoloré selon l'heure. */
+  function ensureSun() {
+    if (sunEl || !skyEl) return sunEl;
+    sunEl = document.createElement('div');
+    sunEl.id = 'sun';
+    skyEl.appendChild(sunEl);
+    return sunEl;
+  }
+
+  /* Bande d'horizon teintée par le biome survolé (océan, désert…). */
+  function ensureHorizon() {
+    if (horizonEl || !skyEl) return horizonEl;
+    horizonEl = document.createElement('div');
+    horizonEl.id = 'horizon';
+    // Inséré en premier pour rester DERRIÈRE les nuages et l'avion.
+    skyEl.insertBefore(horizonEl, skyEl.firstChild);
+    return horizonEl;
+  }
+
+  /**
+   * Applique un état de ciel calculé par Sky.state().
+   * Tolérant : un état absent ou incomplet laisse la scène inchangée
+   * plutôt que de la casser (ce code tourne à chaque tick).
+   */
+  function applySky(s) {
+    if (!skyEl || !s) return;
+
+    skyEl.style.setProperty('--sky-top', s.top);
+    skyEl.style.setProperty('--sky-bottom', s.bottom);
+    skyEl.style.setProperty('--cloud-color', s.cloudColor);
+
+    // Étoiles : opacité continue, donc elles se lèvent progressivement au
+    // crépuscule et réapparaissent en haute altitude même de jour.
+    const st = Math.max(0, Math.min(1, s.stars || 0));
+    if (starsEl) {
+      if (st > 0.02) {
+        ensureStars();
+        starsEl.style.display = 'block';
+        starsEl.style.opacity = st.toFixed(3);
+      } else {
+        starsEl.style.display = 'none';
       }
     }
+
+    // Aurore : plus un décor acheté, mais une intensité liée à la latitude
+    // et à la nuit. En dessous de 5 % on l'éteint pour ne pas payer un
+    // filtre CSS permanent qui ne se voit pas.
+    const au = Math.max(0, Math.min(1, s.aurora || 0));
+    skyEl.classList.toggle('sky-aurora', au > 0.05);
+    skyEl.style.setProperty('--aurora-opacity', au.toFixed(3));
+
+    // Soleil / lune
+    const sun = ensureSun();
+    if (sun) {
+      const visible = s.sunVisible || s.moonVisible;
+      sun.style.display = visible ? 'block' : 'none';
+      if (visible) {
+        sun.style.top = (s.sunY || 20).toFixed(1) + '%';
+        sun.classList.toggle('moon', !s.sunVisible && s.moonVisible);
+      }
+    }
+
+    // Horizon coloré par le biome
+    const hz = ensureHorizon();
+    if (hz) hz.style.setProperty('--horizon-color', s.horizon || '#1f5f8b');
+
+    skyEl.classList.toggle('sky-night', !!s.isNight);
   }
 
   function setPlane(planeId) {
@@ -214,6 +276,6 @@ const Scene = (() => {
     skyEl.classList.toggle('wx-windy', w.windSpeed > 70);
   }
 
-  return { init, setDecor, setPlane, setCondition, update, setWeather,
+  return { init, applySky, setPlane, setCondition, update, setWeather,
            setTurbulence };
 })();

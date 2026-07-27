@@ -397,18 +397,8 @@ const Engine = (() => {
     return true;
   }
 
-  function buyDecor(player, decorId) {
-    const decor = CONFIG.DECORS.find(d => d.id === decorId);
-    if (!decor) return false;
-    if (!player.ownedDecors.includes(decorId)) {
-      if (State.availablePoints(player) < decor.cost) return false;
-      player.pointsSpent += decor.cost;
-      player.ownedDecors.push(decorId);
-    }
-    player.currentDecor = decorId;
-    State.save();
-    return true;
-  }
+  /* buyDecor() a disparu en v3.1 : les décors ne s'achètent plus, le ciel
+     se déduit de la position, de l'heure solaire et de la météo. */
 
   function buyUpgrade(player, upgradeId) {
     const up = CONFIG.UPGRADES.find(u => u.id === upgradeId);
@@ -486,7 +476,7 @@ const Engine = (() => {
 
   return {
     simulate, catchUp, simulateOthers, logActivity, upgradeCost,
-    buyPlane, buyDecor, buyUpgrade,
+    buyPlane, buyUpgrade,
     buyRoute, setRoute, cancelPendingRoute, etaToBase, arrivalBonus,
   };
 })();

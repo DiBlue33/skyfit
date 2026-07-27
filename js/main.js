@@ -55,8 +55,7 @@ const Main = (() => {
     Sync.push(p);
 
     Scene.setPlane(p.currentPlane);
-    Scene.setDecor(p.currentDecor);
-    UI.refreshHUD();
+    UI.refreshHUD();   // peint aussi le ciel via Sky.forPlayer()
 
     Quests.refresh(true);  // 🎯 arme la semaine et solde les quêtes en attente
 

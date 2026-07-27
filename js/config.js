@@ -106,6 +106,7 @@ const CONFIG = {
     discovery:   { icon: '🛬', name: 'Escale découverte' },
     wheel:       { icon: '🎡', name: 'Roue de la chance' },
     quest:       { icon: '🎯', name: 'Quête accomplie' },
+    phenomenon:  { icon: '🌌', name: 'Phénomène observé' },
   },
 
   // --- Roue de la chance 🎡 ---
@@ -247,12 +248,12 @@ const CONFIG = {
             metric: 'upgradeLevels', goal: 1, unit: 'niv.', kero: 300, points: 200 },
           { name: 'Atelier actif', desc: "Cumuler 4 niveaux d'améliorations.",
             metric: 'upgradeLevels', goal: 4, unit: 'niv.', kero: 600, points: 600 },
-          { name: 'Changement de décor', desc: 'Débloquer un 2ᵉ décor.',
-            metric: 'decorsOwned', goal: 2, unit: 'décors', kero: 900, points: 1000 },
+          { name: 'Chasseur de ciels', desc: 'Observer 2 phénomènes célestes en vol.',
+            metric: 'phenomenaSeen', goal: 2, unit: 'phénom.', kero: 900, points: 1000 },
           { name: 'Flotte optimisée', desc: "Cumuler 8 niveaux d'améliorations.",
             metric: 'upgradeLevels', goal: 8, unit: 'niv.', kero: 1500, points: 2200 },
-          { name: 'Galerie complète', desc: 'Débloquer les 4 décors.',
-            metric: 'decorsOwned', goal: 4, unit: 'décors', kero: 2200, points: 4500 },
+          { name: 'Album céleste', desc: 'Observer 4 phénomènes célestes différents.',
+            metric: 'phenomenaSeen', goal: 4, unit: 'phénom.', kero: 2200, points: 4500 },
           { name: 'Tout au maximum', desc: 'Porter les 3 améliorations à leur maximum.',
             metric: 'upgradeLevels', goal: 14, unit: 'niv.', kero: 3200, points: 9000 },
         ],
@@ -443,13 +444,10 @@ const CONFIG = {
     },
   ],
 
-  // --- Boutique : décors ---
-  DECORS: [
-    { id: 'day',    name: 'Ciel de jour',      cost: 0 },
-    { id: 'sunset', name: 'Coucher de soleil', cost: 1500 },
-    { id: 'night',  name: 'Nuit étoilée',      cost: 3000 },
-    { id: 'aurora', name: 'Aurore boréale',    cost: 8000 },
-  ],
+  // --- Décors ---
+  // Supprimés en v3.1 : le ciel n'est plus un article de boutique mais le
+  // reflet de la situation de vol réelle (position, heure solaire locale,
+  // altitude, météo). Voir js/sky.js.
 
   // --- Grades de pilote 🎫 (v2.8) ---
   // Un grade se gagne quand LES DEUX conditions sont remplies : assez

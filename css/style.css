@@ -48,14 +48,69 @@ button {
   overflow: hidden;
 }
 
-#sky.decor-aurora::before {
+/* Aurore boréale (v3.1) — ne s'achète plus : son intensité est calculée
+   par Sky.state() à partir de la latitude et de la nuit, et arrive ici
+   via --aurora-opacity. La classe ne sert qu'à éteindre complètement le
+   pseudo-élément quand il n'y a rien à voir, pour ne pas laisser un
+   dégradé composité en permanence sur la scène. */
+#sky.sky-aurora::before {
   content: '';
   position: absolute; inset: 0;
   background:
     radial-gradient(ellipse 60% 30% at 30% 15%, rgba(80, 255, 180, 0.35), transparent 70%),
     radial-gradient(ellipse 50% 25% at 70% 10%, rgba(120, 160, 255, 0.3), transparent 70%);
+  opacity: var(--aurora-opacity, 0);
+  transition: opacity 2s ease;
   animation: aurora-drift 12s ease-in-out infinite alternate;
   pointer-events: none;
+  z-index: 1;
+}
+
+/* Bande d'horizon teintée par le biome survolé (océan, désert, banquise…).
+   Elle est volontairement très floue et basse : on suggère le sol loin en
+   dessous, on ne dessine pas une carte. */
+#horizon {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 22%;
+  background: linear-gradient(to bottom,
+    transparent,
+    color-mix(in srgb, var(--horizon-color, #1f5f8b) 55%, transparent));
+  filter: blur(6px);
+  transition: background 2.5s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Disque solaire / lunaire : sa hauteur à l'écran suit la hauteur réelle
+   du soleil calculée par trigonométrie. */
+#sun {
+  position: absolute;
+  right: 18%;
+  width: 58px; height: 58px;
+  margin-top: -29px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff6d8 0%, #ffd977 45%, rgba(255, 200, 90, 0) 72%);
+  box-shadow: 0 0 60px 24px rgba(255, 214, 130, 0.35);
+  transition: top 3s ease, opacity 2s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#sun.moon {
+  background: radial-gradient(circle, #ffffff 0%, #dfe7f5 42%, rgba(200, 215, 240, 0) 70%);
+  box-shadow: 0 0 34px 10px rgba(200, 220, 255, 0.22);
+  width: 40px; height: 40px; margin-top: -20px;
+}
+
+@media (max-width: 640px) {
+  #sun { width: 42px; height: 42px; margin-top: -21px; right: 12%; }
+  #sun.moon { width: 30px; height: 30px; margin-top: -15px; }
+  #horizon { height: 18%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #sky.sky-aurora::before { animation: none; }
 }
 
 @keyframes aurora-drift {
@@ -63,7 +118,15 @@ button {
   to   { transform: translateX(4%)  scaleY(1.15); }
 }
 
-#stars { position: absolute; inset: 0; display: none; pointer-events: none; }
+/* L'opacité globale est pilotée en continu par Scene.applySky() : les
+   étoiles se lèvent progressivement au crépuscule au lieu d'apparaître
+   d'un coup, et réapparaissent en haute altitude même en plein jour. */
+#stars {
+  position: absolute; inset: 0; display: none; pointer-events: none;
+  opacity: 0;
+  transition: opacity 2.5s ease;
+  z-index: 1;
+}
 
 .star {
   position: absolute;

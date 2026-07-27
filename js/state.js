@@ -22,9 +22,9 @@ const State = (() => {
       // Progression boutique
       ownedPlanes: ['cessna'],
       currentPlane: 'cessna',
-      ownedDecors: ['day'],
-      currentDecor: 'day',
       upgrades: { yield: 0, aero: 0, tank: 0 },
+      // Phénomènes célestes déjà observés (v3.1) — voir js/sky.js
+      seenPhenomena: [],
       // Réseau de routes (v2.3) — départ de LFPG, Lyon offert
       ownedRoutes: [Routes.DEFAULT_ROUTE],
       currentRoute: Routes.DEFAULT_ROUTE,
@@ -87,7 +87,6 @@ const State = (() => {
   // il faut donc recréer les champs manquants (sinon : plantages).
   function migrate() {
     const planeIds = CONFIG.PLANES.map(p => p.id);
-    const decorIds = CONFIG.DECORS.map(d => d.id);
     const routeIds = Routes.all().map(r => r.id);
     Object.values(data.players).forEach(p => {
       // Listes potentiellement perdues/déformées par Firebase
@@ -97,18 +96,25 @@ const State = (() => {
       if (!Array.isArray(p.ownedPlanes)) {
         p.ownedPlanes = p.ownedPlanes ? Object.values(p.ownedPlanes) : [];
       }
-      if (!Array.isArray(p.ownedDecors)) {
-        p.ownedDecors = p.ownedDecors ? Object.values(p.ownedDecors) : [];
+      // Phénomènes célestes (v3.1) : Firebase supprime les listes vides,
+      // donc on la recrée systématiquement avant toute lecture.
+      if (!Array.isArray(p.seenPhenomena)) {
+        p.seenPhenomena = p.seenPhenomena ? Object.values(p.seenPhenomena) : [];
       }
+      // Reliquat des décors achetables (< v3.1) : on nettoie sans rembourser.
+      delete p.ownedDecors;
+      delete p.currentDecor;
       if (!p.upgrades || typeof p.upgrades !== 'object') {
         p.upgrades = { yield: 0, aero: 0, tank: 0 };
       }
       p.ownedPlanes = (p.ownedPlanes || []).filter(id => planeIds.includes(id));
       if (!p.ownedPlanes.includes('cessna')) p.ownedPlanes.unshift('cessna');
       if (!planeIds.includes(p.currentPlane)) p.currentPlane = 'cessna';
-      p.ownedDecors = (p.ownedDecors || []).filter(id => decorIds.includes(id));
-      if (!p.ownedDecors.includes('day')) p.ownedDecors.unshift('day');
-      if (!decorIds.includes(p.currentDecor)) p.currentDecor = 'day';
+      // Un phénomène retiré du catalogue ne doit pas rester dans la liste.
+      if (typeof Sky !== 'undefined' && Sky.PHENOMENA) {
+        const phIds = Sky.PHENOMENA.map(x => x.id);
+        p.seenPhenomena = p.seenPhenomena.filter(id => phIds.includes(id));
+      }
       if (typeof p.bonusPoints !== 'number') p.bonusPoints = 0;
       // Mécanique de crash (ajoutée en v1.3)
       if (typeof p.crashed !== 'boolean') p.crashed = false;

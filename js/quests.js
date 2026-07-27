@@ -147,7 +147,7 @@ const Quests = (() => {
       regionsVisited: Routes.regionsVisited ? Routes.regionsVisited(p) : 0,
       longestRoute:   longest,
       planesOwned:    (p.ownedPlanes || []).length,
-      decorsOwned:    (p.ownedDecors || []).length,
+      phenomenaSeen:  (p.seenPhenomena || []).length,
       upgradeLevels:  upgradeLevels(p),
       totalSessions:  Number(p.totalSessions) || sport.length,
       sportHours:     (Number(p.totalSportMinutes) || 0) / 60,

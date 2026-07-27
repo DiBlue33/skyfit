@@ -69,11 +69,14 @@ const UI = (() => {
     // 🗺️ Route active : cap suivi et distance restante
     refreshRouteChip(p);
 
-    // Vent 🌬️ : badge + effets de scène (rafraîchis toutes les 5 s, pas à chaque tick)
+    // Vent 🌬️ + ciel 🌅 : rafraîchis toutes les 5 s, pas à chaque tick.
+    // Le ciel se déduit de la position, de l'heure, de l'altitude et de la
+    // météo — il n'y a plus de décor acheté à appliquer.
     if (Date.now() - lastWindPaint > 5000) {
       lastWindPaint = Date.now();
       WeatherUI.refreshBadge(p);
       WeatherUI.refreshScene(p);
+      paintSky(p);
     }
 
     // Scène (un avion qui a déjà crashé reste marqué à vie)
@@ -93,6 +96,44 @@ const UI = (() => {
     Achievements.updateBadge();
     Wheel.refreshButton();     // 🎡 pastille « tour disponible » + compte à rebours
     lastAlt = p.altitude;
+  }
+
+  /* ---------- Ciel dynamique 🌅 ---------- */
+
+  /**
+   * Recalcule le ciel à partir de la situation de vol RÉELLE — position sur
+   * la route, heure solaire locale, altitude, couverture nuageuse — puis
+   * l'applique à la scène. Signale au passage les phénomènes rares observés
+   * pour la première fois (aurore, mer de nuages, stratosphère…).
+   *
+   * Tout est encapsulé dans des try/catch : cette fonction tourne toutes les
+   * 5 s et une route inconnue ou un cache météo vide ne doit jamais figer
+   * le HUD.
+   */
+  function paintSky(p) {
+    if (!p || typeof Sky === 'undefined') return;
+
+    let s = null;
+    try { s = Sky.forPlayer(p); } catch (e) { return; }
+    if (!s) return;
+    Scene.applySky(s);
+
+    // Phénomènes rares : crédités une seule fois par pilote.
+    let found = [];
+    try { found = Sky.observe(p, s) || []; } catch (e) { found = []; }
+    if (!found.length) return;
+
+    State.save();
+    Sync.push(p);
+
+    // Espacés pour que deux découvertes simultanées ne s'écrasent pas.
+    found.forEach((ph, i) => {
+      setTimeout(() => {
+        toast(`${ph.icon} <b>${ph.name}</b> — phénomène observé !<br>` +
+              `<small>${escapeHtml(ph.hint || '')}</small><br>` +
+              `+${fmt(ph.kero)} L ⛽ · +${fmt(ph.points)} ★`, 7500);
+      }, i * 1400);
+    });
   }
 
   /* ---------- Route active 🗺️ ---------- */
@@ -561,16 +602,9 @@ const UI = (() => {
     } else if (shopTab === 'routes') {
       html = routesShopHtml(p);
     } else {
-      html = CONFIG.DECORS.map(d => {
-        const owned = p.ownedDecors.includes(d.id);
-        const current = p.currentDecor === d.id;
-        const canBuy = State.availablePoints(p) >= d.cost;
-        let btn;
-        if (current) btn = `<button class="btn small ghost" disabled type="button">Actif ✓</button>`;
-        else if (owned) btn = `<button class="btn small" data-buy-decor="${d.id}" type="button">Activer</button>`;
-        else btn = `<button class="btn small warm" data-buy-decor="${d.id}" ${canBuy ? '' : 'disabled'} type="button">★ ${fmt(d.cost)}</button>`;
-        return shopItem(d.name, '', current ? 'owned-current' : '', btn);
-      }).join('');
+      // Onglet « Ciel » : purement informatif depuis la v3.1 — il n'y a plus
+      // rien à acheter, le décor se déduit du vol en cours.
+      html = skyShopHtml(p);
     }
     $('shop-content').innerHTML = html;
 
@@ -586,14 +620,6 @@ const UI = (() => {
     $('shop-content').querySelectorAll('[data-buy-upgrade]').forEach(b =>
       b.addEventListener('click', () => {
         if (Engine.buyUpgrade(p, b.dataset.buyUpgrade)) toast('⚙️ Amélioration achetée !');
-        refreshShop(); refreshHUD();
-      }));
-    $('shop-content').querySelectorAll('[data-buy-decor]').forEach(b =>
-      b.addEventListener('click', () => {
-        if (Engine.buyDecor(p, b.dataset.buyDecor)) {
-          Scene.setDecor(p.currentDecor);
-          toast('🌄 Nouveau décor activé !');
-        }
         refreshShop(); refreshHUD();
       }));
     $('shop-content').querySelectorAll('[data-buy-route]').forEach(b =>
@@ -676,6 +702,48 @@ const UI = (() => {
     }).join('');
 
     return head + body;
+  }
+
+  /* ---------- Boutique : onglet Ciel 🌅 ---------- */
+
+  /**
+   * Le ciel ne s'achète plus : il se mérite. Cet onglet montre l'état réel
+   * du ciel survolé et la liste des phénomènes rares, avec pour chacun
+   * l'indice qui dit où et quand aller le chercher.
+   */
+  function skyShopHtml(p) {
+    if (typeof Sky === 'undefined') return `<div class="shop-note">Ciel indisponible.</div>`;
+
+    let s = null;
+    try { s = Sky.forPlayer(p); } catch (e) { s = null; }
+
+    const head = s ? `
+      <div class="shop-note">
+        🌅 Le décor n'est plus un achat : il suit ta position, l'heure locale
+        et la météo réelle. En ce moment tu survoles
+        <b>${s.biomeIcon} ${escapeHtml(s.biomeName)}</b>, il y fait
+        <b>${s.phaseIcon} ${escapeHtml(s.phaseName)}</b>
+        (soleil à ${s.solarElev.toFixed(1).replace('.', ',')}°,
+        ${Math.floor(s.solarHour)} h ${String(Math.round((s.solarHour % 1) * 60)).padStart(2, '0')} solaire).
+      </div>` : `
+      <div class="shop-note">
+        🌅 Le décor suit ta position, l'heure locale et la météo réelle.
+      </div>`;
+
+    const seen = Array.isArray(p.seenPhenomena) ? p.seenPhenomena : [];
+    const items = Sky.PHENOMENA.map(ph => {
+      const got = seen.includes(ph.id);
+      const btn = got
+        ? `<button class="btn small ghost" disabled type="button">Observé ✓</button>`
+        : `<button class="btn small ghost" disabled type="button">🔒</button>`;
+      const desc = `${escapeHtml(ph.hint)}` +
+        `<div class="level">${got ? '✅ déjà observé' : `🎁 +${fmt(ph.kero)} L ⛽ · +${fmt(ph.points)} ★ à la découverte`}</div>`;
+      return shopItem(`${ph.icon} ${escapeHtml(ph.name)}`, desc, got ? 'owned-current' : '', btn);
+    }).join('');
+
+    return head +
+      `<div class="shop-group">Phénomènes — ${seen.length} / ${Sky.PHENOMENA.length}</div>` +
+      items;
   }
 
   function shopItem(name, desc, cls, btnHtml) {

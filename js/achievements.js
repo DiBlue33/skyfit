@@ -143,16 +143,29 @@ const Achievements = (() => {
       test: (p) => (p.ownedPlanes || []).includes(pl.id),
     }));
 
-    // --- Décors ---
-    CONFIG.DECORS.filter(d => d.cost > 0).forEach(d => defs.push({
-      id: 'decor_' + d.id,
-      group: 'Décors',
-      icon: d.id === 'sunset' ? '🌇' : d.id === 'night' ? '🌃' : '🌌',
-      name: d.name,
-      desc: `Débloquer le décor « ${d.name} »`,
-      reward: 75,
-      test: (p) => (p.ownedDecors || []).includes(d.id),
+    // --- Ciel : phénomènes célestes observés en vol (v3.1) ---
+    // Un succès par phénomène : ils ne s'achètent pas, il faut être au bon
+    // endroit à la bonne heure et à la bonne altitude.
+    const phList = (typeof Sky !== 'undefined' && Sky.PHENOMENA) ? Sky.PHENOMENA : [];
+    phList.forEach(ph => defs.push({
+      id: 'sky_' + ph.id,
+      group: 'Ciel',
+      icon: ph.icon,
+      name: ph.name,
+      desc: ph.hint,
+      reward: 150,
+      test: (p) => (p.seenPhenomena || []).includes(ph.id),
     }));
+    // Collectionneur : tout le catalogue céleste.
+    if (phList.length) {
+      defs.push({
+        id: 'sky_all', group: 'Ciel', icon: '🔭',
+        name: 'Observateur du ciel',
+        desc: `Observer les ${phList.length} phénomènes célestes`,
+        reward: 1200,
+        test: (p) => (p.seenPhenomena || []).length >= phList.length,
+      });
+    }
 
     // --- Chance : roue quotidienne 🎡 ---
     defs.push(
@@ -366,7 +379,7 @@ const Achievements = (() => {
     if (!p) return;
 
     const groups = VOYAGE_GROUPS.concat(
-      ['Réseau', 'Assiduité', 'Séries', 'Quêtes', 'Flotte', 'Décors', 'Chance', 'Divers']);
+      ['Réseau', 'Assiduité', 'Séries', 'Quêtes', 'Flotte', 'Ciel', 'Chance', 'Divers']);
     const all = defs();
     const claimed = all.filter(d => status(p, d) === 'claimed').length;
     $('ach-summary').textContent =
