@@ -53,6 +53,26 @@ const CONFIG = {
     ENABLED: true,
     MAX_RATIO: 0.25,     // effet max sur la vitesse : ±25 %
     HOURS_AHEAD: 48,     // horizon des prévisions affichées (J+1 / J+2)
+
+    /* --- Turbulences (v3.0.1) -------------------------------------
+       ⚠️ Un vent fort NE PROVOQUE PAS de turbulences : un jet-stream
+       de 250 km/h bien établi est parfaitement lisse. Ce qui secoue
+       l'avion, c'est le CISAILLEMENT VERTICAL (variation du vecteur
+       vent d'un niveau de pression au suivant) et la CONVECTION
+       (orages, averses). L'ancien seuil « vent > 110 km/h » laissait
+       donc l'avion se balancer en permanence dès qu'il montait.
+       Unité du cisaillement : km/h par tranche de 1 000 ft.        */
+    TURB: {
+      SHEAR: [6, 12, 20],   // seuils légères / modérées / fortes
+      LOW_ALT_FT: 5000,     // sous cette altitude, les rafales comptent
+      LOW_WIND: [45, 70],   // légères / modérées près du sol
+      CODES: {              // codes Open-Meteo → niveau de turbulence
+        95: 3, 96: 3, 99: 3,             // orages
+        80: 2, 81: 2, 82: 3,             // averses
+        63: 1, 65: 2, 66: 2, 67: 2,      // pluie soutenue / verglaçante
+      },
+      LABELS: ['calme', 'légères', 'modérées', 'fortes'],
+    },
   },
 
   // --- Activités sportives (litres de kérosène par minute) ---

@@ -256,6 +256,36 @@ const Weather = (() => {
   }
 
   /**
+   * Cisaillement vertical du vent à un point, en km/h par 1 000 ft.
+   *
+   * C'est LE bon indicateur de turbulence en air clair : on compare le
+   * VECTEUR vent des deux niveaux de pression qui encadrent l'avion.
+   * Un jet-stream de 250 km/h homogène donne un cisaillement nul (vol
+   * parfaitement lisse) ; c'est en entrant et en sortant du courant que
+   * ça secoue. Renvoie null si le relevé est incomplet.
+   */
+  function shearAtPoint(pt, altFt, hi) {
+    if (!pt || !Array.isArray(pt.u) || !Array.isArray(pt.v)) return null;
+    const n = LEVELS.length;
+    // Deux niveaux voisins encadrant l'altitude (ou la paire la plus
+    // proche quand l'avion est sous le 1er / au-dessus du dernier).
+    let lo = 0;
+    if (altFt >= LEVELS[n - 1].ft) lo = n - 2;
+    else if (altFt > LEVELS[0].ft) {
+      for (let i = 0; i < n - 1; i++) {
+        if (altFt >= LEVELS[i].ft && altFt <= LEVELS[i + 1].ft) { lo = i; break; }
+      }
+    }
+    const hiLvl = lo + 1;
+    const uA = atHour(pt.u[lo], hi),    vA = atHour(pt.v[lo], hi);
+    const uB = atHour(pt.u[hiLvl], hi), vB = atHour(pt.v[hiLvl], hi);
+    if (uA === null || uB === null || vA === null || vB === null) return null;
+    const dz = (LEVELS[hiLvl].ft - LEVELS[lo].ft) / 1000;
+    if (!(dz > 0)) return null;
+    return Math.hypot(uB - uA, vB - vA) / dz;
+  }
+
+  /**
    * Situation de vol normalisée. Accepte :
    *   - un objet `geo` issu de Routes.geo(player) / Routes.geoAt(...)
    *   - un nombre = km parcourus depuis LFPG sur la route active (aller)
@@ -400,6 +430,69 @@ const Weather = (() => {
   }
 
   /**
+   * Turbulences à la position et à l'altitude du joueur.
+   *   { ok, level: 0..3, label, shear (km/h/1000ft), cause }
+   *
+   * Trois sources, on garde la plus forte :
+   *   1. cisaillement vertical du vent (turbulence en air clair) ;
+   *   2. convection (orage, averse) via le code météo ;
+   *   3. rafales à basse altitude (sous 5 000 ft, près du relief).
+   * Sans données : level 0, `ok: false` — l'avion vole lisse, jamais
+   * d'exception (cette fonction est appelée à chaque rafraîchissement).
+   */
+  function turbulenceAt(where, altFt, timeMs) {
+    const T = (CONFIG.WEATHER && CONFIG.WEATHER.TURB) || {};
+    const labels = T.LABELS || ['calme', 'légères', 'modérées', 'fortes'];
+    const none = { ok: false, level: 0, label: labels[0], shear: 0, cause: null };
+    if (!data || !CONFIG.WEATHER.ENABLED) return none;
+
+    const hi = hourIndex(typeof timeMs === 'number' ? timeMs : Date.now());
+    if (hi === null || hi < -1 || hi > data.hours) return none;
+    const geo = asGeo(where);
+    const fr = frame(geo);
+    if (!fr) return none;
+
+    const ft = (typeof altFt === 'number' && isFinite(altFt)) ? altFt : 0;
+
+    /* 1) Cisaillement vertical — interpolé le long de la route */
+    const sA = shearAtPoint(data.points[fr.iA], ft, hi);
+    const sB = shearAtPoint(data.points[fr.iB], ft, hi);
+    let shear = 0;
+    if (sA !== null && sB !== null) shear = sA + (sB - sA) * fr.f;
+    else if (sA !== null) shear = sA;
+    else if (sB !== null) shear = sB;
+
+    const th = T.SHEAR || [6, 12, 20];
+    let level = 0, cause = null;
+    for (let i = th.length - 1; i >= 0; i--) {
+      if (shear >= th[i]) { level = i + 1; cause = 'cisaillement'; break; }
+    }
+
+    /* 2) Convection : orages et averses secouent bien plus qu'un jet-stream */
+    const cond = conditionsAt(geo, timeMs);
+    const byCode = (T.CODES || {})[cond.code];
+    if (cond.ok && byCode && byCode > level) { level = byCode; cause = 'convection'; }
+
+    /* 3) Basse altitude : rafales et turbulence mécanique près du sol */
+    if (ft < (T.LOW_ALT_FT || 5000)) {
+      const w = windAt(geo, ft, timeMs);
+      const lw = T.LOW_WIND || [45, 70];
+      let low = 0;
+      if (w.ok && w.speed >= lw[1]) low = 2;
+      else if (w.ok && w.speed >= lw[0]) low = 1;
+      if (low > level) { level = low; cause = 'basse altitude'; }
+    }
+
+    return {
+      ok: true,
+      level,
+      label: labels[Math.min(level, labels.length - 1)],
+      shear: Math.round(shear * 10) / 10,
+      cause: level > 0 ? cause : null,
+    };
+  }
+
+  /**
    * Grille de prévisions pour le panneau météo :
    * pour chaque altitude palier et chaque heure à venir, le vent et son effet.
    *   { t0, hours, alts: [ft], rows: [ { ft, cells: [ {tail, speed, ratio} ] } ] }
@@ -492,8 +585,8 @@ const Weather = (() => {
 
   return {
     init, refresh, onUpdate, load,
-    windAt, ratioFor, factorFor, summaryFor, conditionsAt,
+    windAt, ratioFor, factorFor, summaryFor, conditionsAt, turbulenceAt,
     forecastGrid, bestWindow, activeRouteId, info, error,
-    LEVELS, _setData,
+    LEVELS, _setData, _shearAtPoint: shearAtPoint,
   };
 })();

@@ -81,16 +81,23 @@ const WeatherUI = (() => {
     }
 
     const k = kind(w.tail, w.speed);
-    el.className = 'wind-badge ' + k.cls + (w.stale ? ' stale' : '');
+    const t = Weather.turbulenceAt(Routes.geo(p), p.altitude, Date.now());
+    el.className = 'wind-badge ' + k.cls + (w.stale ? ' stale' : '') +
+      (t.level >= 2 ? ' shaky' : '');
     el.innerHTML =
       `<span class="wb-arrow" style="--rot:${((w.dirFrom + 180) % 360).toFixed(0)}deg">➤</span>` +
       `<span class="wb-main"><b>${fmt(w.speed)}</b> km/h` +
       `<span class="wb-long"> · ${k.txt}</span></span>` +
+      (t.level > 0 ? `<span class="wb-turb" aria-label="turbulences ${t.label}">〰️</span>` : '') +
       `<span class="wb-effect">${pct(w.ratio)}</span>`;
     el.title =
       `${k.txt} : ${fmt(w.speed)} km/h venant du ${fmt(w.dirFrom)}°, ` +
       `composante ${w.tail >= 0 ? 'arrière' : 'de face'} de ${fmt(Math.abs(w.tail))} km/h.\n` +
-      `Vitesse air ${fmt(w.airspeed)} km/h → vitesse sol ${fmt(w.ground)} km/h (${pct(w.ratio)}).` +
+      `Vitesse air ${fmt(w.airspeed)} km/h → vitesse sol ${fmt(w.ground)} km/h (${pct(w.ratio)}).\n` +
+      (t.level > 0
+        ? `Turbulences ${t.label} (${t.cause}, cisaillement ${t.shear} km/h/1000 ft) — ` +
+          'elles secouent l\'avion mais n\'ont AUCUN effet sur la vitesse.'
+        : 'Air calme : aucune turbulence.') +
       (w.stale ? '\n⚠️ Prévisions en cache (hors ligne).' : '') +
       '\nCliquer pour ouvrir la météo.';
   }
@@ -124,6 +131,8 @@ const WeatherUI = (() => {
 
     const k = kind(w.tail, w.speed);
     const c = cond.ok ? wmo(cond.code) : { icon: '🌐', label: '—' };
+    const tb = Weather.turbulenceAt(geo, p.altitude, Date.now());
+    const tbIcon = ['🟢', '🟡', '🟠', '🔴'][tb.level] || '🟢';
     $('weather-now').innerHTML = `
       <div class="wx-now">
         <div class="wx-card">
@@ -143,6 +152,17 @@ const WeatherUI = (() => {
           <div class="wx-card-label">Effet sur la vitesse</div>
           <div class="wx-card-value">${pct(w.ratio)}</div>
           <div class="wx-card-sub">${fmt(w.airspeed)} → <b>${fmt(w.ground)}</b> km/h au sol</div>
+        </div>
+        <div class="wx-card wx-turb-card turb-${tb.level}">
+          <div class="wx-card-label">Turbulences</div>
+          <div class="wx-card-value">${tbIcon} ${escape(tb.label)}</div>
+          <div class="wx-card-sub">${tb.level > 0
+            ? (tb.cause === 'cisaillement'
+                // Éviter « cisaillement · cisaillement 28 km/h » : quand c'est
+                // lui la cause, la valeur chiffrée dit déjà tout.
+                ? `cisaillement vertical ${tb.shear} km/h / 1 000 ft`
+                : `${escape(tb.cause)} · cisaillement ${tb.shear} km/h / 1 000 ft`)
+            : 'air lisse · aucun effet sur la vitesse'}</div>
         </div>
       </div>`;
 
@@ -275,13 +295,16 @@ const WeatherUI = (() => {
 
   function refreshScene(p) {
     if (typeof Scene.setWeather !== 'function') return;
+    const geo = Routes.geo(p);
     const w = Weather.summaryFor(p);
-    const c = Weather.conditionsAt(Routes.geo(p), Date.now());
+    const c = Weather.conditionsAt(geo, Date.now());
+    const t = Weather.turbulenceAt(geo, p.altitude, Date.now());
     Scene.setWeather({
       ok: w.ok,
       ratio: w.ratio,
       windSpeed: w.speed,
       cross: w.cross,
+      turb: t.level,
       cloud: c.ok ? c.cloud : null,
       precip: c.ok ? c.precip : 0,
       code: c.ok ? c.code : 0,

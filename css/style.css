@@ -1976,6 +1976,25 @@ button {
 #wind-badge.pending { opacity: 0.7; font-style: italic; }
 #wind-badge.stale::after { content: '⚠️'; font-size: 0.7rem; }
 
+/* Turbulences (v3.0.1) — le 〰️ n'apparaît que si le niveau > 0. Il est
+   volontairement discret : il indique une gêne visuelle, PAS un effet sur
+   la vitesse (le vent seul s'en charge, via .wb-effect). */
+#wind-badge .wb-turb {
+  flex: none;
+  font-size: 0.72rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+#wind-badge.shaky .wb-turb { animation: wb-turb-shake 0.5s ease-in-out infinite; }
+@keyframes wb-turb-shake {
+  0%, 100% { transform: translateY(0); }
+  30%      { transform: translateY(-1.5px); }
+  70%      { transform: translateY(1.5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #wind-badge.shaky .wb-turb { animation: none; }
+}
+
 /* ---------- Panneau météo ---------- */
 
 .modal-weather { max-width: 940px; }
@@ -2001,6 +2020,26 @@ button {
 .wx-card.good .wx-card-value { color: #1c7a45; }
 .wx-card.bad   { background: rgba(231, 76, 60, 0.09); border-color: rgba(231, 76, 60, 0.28); }
 .wx-card.bad .wx-card-value  { color: #b4342a; }
+
+/* Carte « Turbulences » du panneau météo : 4 niveaux colorés (0 = air lisse).
+   Le libellé explique la CAUSE (cisaillement / convection / basse altitude)
+   pour qu'on comprenne pourquoi ça secoue — un vent fort ne suffit pas. */
+.wx-turb-card.turb-0 { background: rgba(39, 174, 96, 0.08);  border-color: rgba(39, 174, 96, 0.25); }
+.wx-turb-card.turb-0 .wx-card-value { color: #1c7a45; }
+.wx-turb-card.turb-1 { background: rgba(241, 196, 15, 0.11); border-color: rgba(241, 196, 15, 0.35); }
+.wx-turb-card.turb-1 .wx-card-value { color: #8a6d0b; }
+.wx-turb-card.turb-2 { background: rgba(230, 126, 34, 0.12); border-color: rgba(230, 126, 34, 0.35); }
+.wx-turb-card.turb-2 .wx-card-value { color: #a2560f; }
+.wx-turb-card.turb-3 { background: rgba(231, 76, 60, 0.13);  border-color: rgba(231, 76, 60, 0.4); }
+.wx-turb-card.turb-3 .wx-card-value { color: #b4342a; }
+.wx-turb-card.turb-3 { animation: wx-turb-pulse 1.6s ease-in-out infinite; }
+@keyframes wx-turb-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+  50%      { box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.16); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wx-turb-card.turb-3 { animation: none; }
+}
 
 .wx-card .wb-arrow {
   display: inline-block;
@@ -2083,6 +2122,20 @@ button {
 
 #sky.wx-overcast { filter: saturate(0.82) brightness(0.93); }
 
+/* Turbulences ≥ modérées : la couche de nuages ondule légèrement, ce qui
+   renforce la sensation d'air remué sans toucher aux nuages eux-mêmes
+   (`.cloud` porte déjà son animation de défilement, on n'y touche pas —
+   c'est le CONTENEUR #clouds qu'on anime). */
+#sky.wx-turb #clouds { animation: sky-turb 3.1s ease-in-out infinite; }
+@keyframes sky-turb {
+  0%, 100% { transform: translateY(0); }
+  35%      { transform: translateY(-2px); }
+  70%      { transform: translateY(2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #sky.wx-turb #clouds { animation: none; }
+}
+
 #rain { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.6s ease; }
 #rain.on { opacity: 0.55; }
 #rain i {
@@ -2099,15 +2152,82 @@ button {
   to   { transform: translate(-14vw, 120vh); }
 }
 
-#plane.turbulence { animation: turb 0.42s ease-in-out infinite; }
-@keyframes turb {
-  0%, 100% { margin-top: 0;    transform: rotate(0deg); }
-  25%      { margin-top: -3px; transform: rotate(-1.1deg); }
-  75%      { margin-top: 3px;  transform: rotate(1.1deg); }
+/* ---------- Turbulences (v3.0.1) ----------
+   L'ancienne version remplaçait purement et simplement `hover-bob` par un
+   va-et-vient sinusoïdal de 0,42 s : l'avion se BALANÇAIT comme un métronome
+   au lieu d'être secoué, et comme le déclencheur était « vent > 110 km/h »
+   il le faisait quasiment en permanence dès qu'on prenait de l'altitude.
+
+   Nouvelle règle de partage, à respecter pour toute évolution :
+     • `#plane`            garde `hover-bob` et n'anime QUE `margin-top`
+       (le flottement de croisière, toujours présent) ;
+     • `#plane.turb-N`     n'anime QUE `transform` (tangage + décalage),
+       donc les deux animations se composent au lieu de s'écraser ;
+     • `.plane-img/.plane-svg` porte le tremblement haute fréquence.
+   Les cycles durent 2,3 à 3,7 s avec des amplitudes irrégulières : c'est ce
+   qui donne l'impression d'un air agité plutôt que d'une balançoire.        */
+
+#plane.turb-1 { animation: hover-bob 3.2s ease-in-out infinite, turb-light 3.7s ease-in-out infinite; }
+#plane.turb-2 { animation: hover-bob 3.2s ease-in-out infinite, turb-mod 2.9s ease-in-out infinite; }
+#plane.turb-3 { animation: hover-bob 3.2s ease-in-out infinite, turb-strong 2.3s ease-in-out infinite; }
+
+/* Légères : on sent à peine l'avion travailler. */
+@keyframes turb-light {
+  0%, 100% { transform: translateY(0)      rotate(0deg); }
+  18%      { transform: translateY(-0.6px) rotate(-0.22deg); }
+  41%      { transform: translateY(0.4px)  rotate(0.15deg); }
+  63%      { transform: translateY(-0.3px) rotate(-0.1deg); }
+  84%      { transform: translateY(0.7px)  rotate(0.25deg); }
 }
 
+/* Modérées : tangage net, mais toujours irrégulier. */
+@keyframes turb-mod {
+  0%, 100% { transform: translateY(0)      rotate(0deg); }
+  13%      { transform: translateY(-1.6px) rotate(-0.55deg); }
+  29%      { transform: translateY(0.9px)  rotate(0.3deg); }
+  47%      { transform: translateY(-0.5px) rotate(-0.15deg); }
+  61%      { transform: translateY(1.8px)  rotate(0.6deg); }
+  78%      { transform: translateY(-1.1px) rotate(-0.4deg); }
+  91%      { transform: translateY(0.6px)  rotate(0.2deg); }
+}
+
+/* Fortes : coups secs, l'avion est vraiment chahuté. */
+@keyframes turb-strong {
+  0%, 100% { transform: translateY(0)      rotate(0deg); }
+  9%       { transform: translateY(-3.2px) rotate(-1deg); }
+  21%      { transform: translateY(2.1px)  rotate(0.75deg); }
+  33%      { transform: translateY(-1.2px) rotate(-0.3deg); }
+  46%      { transform: translateY(3.4px)  rotate(1.1deg); }
+  58%      { transform: translateY(-2.6px) rotate(-0.85deg); }
+  71%      { transform: translateY(1.4px)  rotate(0.5deg); }
+  86%      { transform: translateY(-1.9px) rotate(-0.65deg); }
+}
+
+/* Tremblement haute fréquence : uniquement en turbulences fortes, et porté
+   par l'IMAGE et non par #plane, pour ne pas écraser le tangage ci-dessus. */
+#plane.turb-3 .plane-img,
+#plane.turb-3 .plane-svg { animation: turb-buffet 0.19s linear infinite; }
+/* ⚠️ L'hélice est un calque SÉPARÉ, positionné en absolu sur #plane : si on
+   secoue l'image sans la secouer aussi, l'hélice se décolle du nez. Les deux
+   animations portent sur des propriétés différentes, elles se composent.   */
+#plane.turb-3 .prop-overlay {
+  animation: prop-spin 0.14s linear infinite, turb-buffet 0.19s linear infinite;
+}
+@keyframes turb-buffet {
+  0%, 100% { transform: translate(0, 0); }
+  25%      { transform: translate(0.5px, -0.6px); }
+  50%      { transform: translate(-0.4px, 0.5px); }
+  75%      { transform: translate(0.3px, 0.4px); }
+}
+
+/* Un avion posé ne tangue plus (double sécurité avec Scene.setCondition). */
+#plane.crashed.turb-1, #plane.crashed.turb-2, #plane.crashed.turb-3 { animation: none; }
+#plane.crashed .plane-img, #plane.crashed .plane-svg { animation: none; }
+
 @media (prefers-reduced-motion: reduce) {
-  #plane.turbulence { animation: none; }
+  #plane.turb-1, #plane.turb-2, #plane.turb-3 { animation: hover-bob 3.2s ease-in-out infinite; }
+  #plane.turb-3 .plane-img, #plane.turb-3 .plane-svg { animation: none; }
+  #plane.turb-3 .prop-overlay { animation: prop-spin 0.14s linear infinite; }
   #rain i { animation: none; }
 }
 
@@ -2116,6 +2236,9 @@ button {
   #wind-badge { margin-top: 5px; padding: 4px 6px; font-size: 0.63rem; gap: 4px; }
   #wind-badge .wb-arrow { font-size: 0.8rem; }
   #wind-badge .wb-effect { font-size: 0.62rem; padding: 1px 4px; }
+  /* La colonne de droite est étroite : le 〰️ est le premier élément qu'on
+     rétrécit, .wb-main se tronquant déjà tout seul (min-width: 0). */
+  #wind-badge .wb-turb { font-size: 0.62rem; }
 
   .wx-now { grid-template-columns: 1fr; gap: 7px; }
   .wx-card-value { font-size: 1rem; }

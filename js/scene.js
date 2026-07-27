@@ -122,6 +122,9 @@ const Scene = (() => {
   function setCondition(isCrashed, isDamaged) {
     plane.classList.toggle('crashed', isCrashed);
     plane.classList.toggle('damaged', !isCrashed && isDamaged);
+    // Un avion posé ne subit plus les turbulences : sans ça, l'épave
+    // continuait de tanguer au sol.
+    if (isCrashed) plane.classList.remove('turb-1', 'turb-2', 'turb-3');
   }
 
   /* ------------------------------------------------------------
@@ -147,14 +150,37 @@ const Scene = (() => {
     return rainLayer;
   }
 
+  /* Retire les 3 classes de turbulence d'un élément. */
+  function clearTurb(el) {
+    if (!el) return;
+    el.classList.remove('turb-1', 'turb-2', 'turb-3');
+  }
+
+  /**
+   * Niveau de turbulence appliqué à l'avion : 0 (lisse) à 3 (fortes).
+   * Une seule classe à la fois ; un avion posé (crashé) ne bouge plus.
+   */
+  function setTurbulence(level) {
+    const n = Math.max(0, Math.min(3, Math.round(Number(level) || 0)));
+    if (skyEl) skyEl.classList.toggle('wx-turb', n >= 2);
+    if (!plane) return n;
+    const wanted = n > 0 && !plane.classList.contains('crashed') ? 'turb-' + n : null;
+    if (wanted && plane.classList.contains(wanted)) return n;  // rien à faire
+    clearTurb(plane);
+    if (wanted) plane.classList.add(wanted);
+    return n;
+  }
+
   /**
    * Applique la météo réelle à la scène.
-   * @param w { ok, ratio, windSpeed, cross, cloud (0-100 ou null), precip (mm), code }
+   * @param w { ok, ratio, windSpeed, cross, turb (0-3),
+   *           cloud (0-100 ou null), precip (mm), code }
    */
   function setWeather(w) {
     if (!skyEl) return;
     if (!w || !w.ok) {
       skyEl.classList.remove('wx-overcast', 'wx-windy', 'wx-turb');
+      clearTurb(plane);
       skyEl.style.removeProperty('--wind-factor');
       skyEl.style.removeProperty('--cloud-opacity');
       if (rainLayer) rainLayer.classList.remove('on');
@@ -179,12 +205,15 @@ const Scene = (() => {
       lastRainOn = rainOn;
     }
 
-    // 4) Turbulences : vent fort ou orage → léger tremblement de l'avion
-    const turb = w.windSpeed > 110 || Math.abs(w.cross || 0) > 70 || (w.code >= 95);
-    skyEl.classList.toggle('wx-turb', !!turb);
+    // 4) Turbulences — le niveau est calculé par Weather.turbulenceAt()
+    //    (cisaillement vertical / convection / rafales basses), PAS par la
+    //    force du vent : un jet-stream homogène est parfaitement lisse.
+    setTurbulence(w.turb || 0);
+
+    // 5) Ciel « venteux » : purement décoratif, là oui la force suffit
     skyEl.classList.toggle('wx-windy', w.windSpeed > 70);
-    if (plane) plane.classList.toggle('turbulence', !!turb);
   }
 
-  return { init, setDecor, setPlane, setCondition, update, setWeather };
+  return { init, setDecor, setPlane, setCondition, update, setWeather,
+           setTurbulence };
 })();
