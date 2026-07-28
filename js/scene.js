@@ -23,6 +23,97 @@ const Scene = (() => {
     spawnInitialClouds();
   }
 
+  /* ------------------------------------------------------------------
+     Nuages « vapeur » (v3.4 — direction A de la maquette comparative).
+
+     Jusqu'à la v3.3 un nuage était TROIS ellipses fixes de la même couleur :
+     le même motif répété neuf fois, un contour net d'autocollant, aucun
+     volume. Ici la silhouette est tirée au sort (4 à 7 lobes le long d'une
+     crête en cloche), puis DÉFORMÉE par un bruit fractal : les bords
+     s'effilochent et se fondent dans le ciel.
+
+     ⚠️ Le `baseFrequency` est ANISOTROPE (x ≪ y). C'est tout le truc : avec
+     un bruit isotrope les filaments partent dans tous les sens et le nuage
+     a l'air rongé ; en étirant le bruit à l'horizontale ils s'alignent sur
+     le vent et on lit de la vapeur.
+     ------------------------------------------------------------------ */
+
+  /* Deux filtres de turbulence par nuage × neuf nuages : c'est le seul poste
+     de la scène qui peut faire tousser un téléphone. Sur petit écran on
+     retire l'écharpe diffuse et on descend d'un octave. */
+  function lightMode() {
+    return !!(window.matchMedia && window.matchMedia('(max-width: 640px)').matches);
+  }
+
+  function cloudShape() {
+    const n = 4 + Math.floor(Math.random() * 4);
+    const peak = 0.3 + Math.random() * 0.45;      // où se trouve le sommet
+    const lobes = [];
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0.5 : i / (n - 1);
+      // hauteur en cloche autour du sommet → crête bombée, jamais plate
+      const bell = Math.exp(-Math.pow((t - peak) / 0.42, 2));
+      lobes.push({
+        cx: 26 + t * 148 + (Math.random() - 0.5) * 13,
+        cy: 68 - bell * 26 + (Math.random() - 0.5) * 8,
+        rx: 16 + bell * 24 + Math.random() * 9,
+        ry: 11 + bell * 17 + Math.random() * 6,
+      });
+    }
+    // Base aplatie qui relie les lobes : sans elle on voit les creux entre eux.
+    return [{ cx: 100, cy: 70, rx: 82, ry: 15 }].concat(lobes);
+  }
+
+  function ellipsesOf(sh) {
+    return sh.map(l =>
+      `<ellipse cx="${l.cx.toFixed(1)}" cy="${l.cy.toFixed(1)}" ` +
+      `rx="${l.rx.toFixed(1)}" ry="${l.ry.toFixed(1)}"/>`).join('');
+  }
+
+  function cloudSvg(width) {
+    const id = ++cloudSeed;
+    const seed = Math.floor(Math.random() * 9999);
+    const light = lightMode();
+    const body = ellipsesOf(cloudShape());
+
+    // L'écharpe : la même silhouette, beaucoup plus déformée et floue,
+    // posée DERRIÈRE le corps. C'est le décalage entre les deux passes qui
+    // donne l'impression de matière plutôt que de découpe.
+    const veilFilter = light ? '' : `
+        <filter id="sfv${id}" x="-70%" y="-110%" width="240%" height="340%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.01 0.03"
+                        numOctaves="4" seed="${seed + 7}" result="n2"/>
+          <feDisplacementMap in="SourceGraphic" in2="n2" scale="58"
+                             xChannelSelector="R" yChannelSelector="G"/>
+          <feGaussianBlur stdDeviation="5"/>
+        </filter>`;
+    const veil = light ? '' : `
+      <g filter="url(#sfv${id})" opacity="0.28">
+        <g fill="var(--cloud-body)">${body}</g>
+      </g>`;
+
+    return `
+      <svg viewBox="0 0 200 100" width="${width}" height="${Math.round(width * 0.5)}"
+           style="overflow:visible" aria-hidden="true">
+        <defs>
+          <filter id="sfb${id}" x="-55%" y="-85%" width="210%" height="300%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.016 0.045"
+                          numOctaves="${light ? 3 : 4}" seed="${seed}" result="n"/>
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="36"
+                               xChannelSelector="R" yChannelSelector="G"/>
+            <feGaussianBlur stdDeviation="2.6"/>
+          </filter>${veilFilter}
+          <linearGradient id="sfg${id}" x1="0.12" y1="1" x2="0.88" y2="0.05">
+            <stop offset="0%"   stop-color="var(--cloud-shade)"/>
+            <stop offset="48%"  stop-color="var(--cloud-body)"/>
+            <stop offset="100%" stop-color="var(--cloud-rim)"/>
+          </linearGradient>
+        </defs>${veil}
+      <g filter="url(#sfb${id})" opacity="0.95">
+        <g fill="url(#sfg${id})">${body}</g>
+      </g></svg>`;
+  }
+
   function makeCloud(startInside) {
     const c = document.createElement('div');
     c.className = 'cloud';
@@ -33,14 +124,7 @@ const Scene = (() => {
     c.style.setProperty('--scale', scale.toFixed(2));
     c.style.setProperty('--dur', dur.toFixed(1) + 's');
     if (startInside) c.style.setProperty('--delay', (-Math.random() * dur).toFixed(1) + 's');
-    c.innerHTML = `
-      <svg viewBox="0 0 120 60" width="${Math.round(90 * scale)}">
-        <g fill="var(--cloud-color)" opacity="0.9">
-          <ellipse cx="40" cy="40" rx="30" ry="16"/>
-          <ellipse cx="70" cy="34" rx="26" ry="18"/>
-          <ellipse cx="95" cy="42" rx="20" ry="12"/>
-        </g>
-      </svg>`;
+    c.innerHTML = cloudSvg(Math.round(120 * scale));
     c.addEventListener('animationiteration', () => {
       // varie la hauteur à chaque passage
       c.style.top = (5 + Math.random() * 80) + '%';
@@ -70,19 +154,58 @@ const Scene = (() => {
     }
   }
 
-  /* Astre solaire / lunaire (v3.3) : plus un simple disque en dégradé mais
-     trois couches empilées — des rayons qui tournent très lentement, un halo
-     qui respire, et le cœur. Chaque couche a sa propre animation, sur son
-     propre élément : #sun ne fait que se déplacer (transition sur `top`),
-     ce qui préserve l'invariant de composition des animations. */
+  /* Astre solaire / lunaire — refondu en v3.4 pour passer du soleil « en
+     étoile » (secteurs nets en conic-gradient, très dessin animé) à un astre
+     réaliste, assorti aux nuages vapeur.
+
+     Ce qui fait le réalisme, dans l'ordre d'importance :
+       1. plus aucun rayon à bord net — la lumière diffusée par l'atmosphère
+          n'a pas de contour ;
+       2. un bloom à décroissance en plusieurs paliers, qui blanchit le ciel
+          autour de l'astre au lieu de s'arrêter sur un bord visible ;
+       3. un disque petit et surexposé : un vrai soleil est brûlé au centre,
+          c'est le halo qui donne l'intensité, pas la taille du disque ;
+       4. l'aplatissement vertical près de l'horizon (réfraction).
+
+     Les trois couches gardent leurs noms de la v3.3 (.sun-rays / .sun-halo /
+     .sun-core) : seul leur contenu change, les tests restent lisibles.
+     ⚠️ Invariant de composition inchangé : #sun n'anime QUE sa position. */
   function ensureSun() {
     if (sunEl || !skyEl) return sunEl;
     sunEl = document.createElement('div');
     sunEl.id = 'sun';
     sunEl.innerHTML =
-      '<div class="sun-rays"></div><div class="sun-halo"></div><div class="sun-core"></div>';
+      '<div class="sun-rays">' + coronaSvg() + '</div>' +
+      '<div class="sun-halo"></div><div class="sun-core"></div>';
     skyEl.appendChild(sunEl);
     return sunEl;
+  }
+
+  /* La couronne : un anneau de lueur déformé par le MÊME bruit fractal que
+     les nuages, pour que l'astre appartienne visuellement au même monde.
+     Le dégradé part d'une opacité nulle au centre — c'est un anneau, pas un
+     disque : le cœur est dessiné par .sun-core par-dessus. */
+  function coronaSvg() {
+    return `
+      <svg viewBox="0 0 200 200" style="overflow:visible" aria-hidden="true">
+        <defs>
+          <filter id="sf-corona" x="-45%" y="-45%" width="190%" height="190%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.011"
+                          numOctaves="3" seed="17" result="cn"/>
+            <feDisplacementMap in="SourceGraphic" in2="cn" scale="38"
+                               xChannelSelector="R" yChannelSelector="G"/>
+            <feGaussianBlur stdDeviation="5"/>
+          </filter>
+          <radialGradient id="sf-corona-g">
+            <stop offset="0%"   stop-color="var(--sun-core)" stop-opacity="0"/>
+            <stop offset="30%"  stop-color="var(--sun-core)" stop-opacity="0.42"/>
+            <stop offset="55%"  stop-color="var(--sun-warm)" stop-opacity="0.26"/>
+            <stop offset="100%" stop-color="var(--sun-warm)" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="100" cy="100" r="84" fill="url(#sf-corona-g)"
+                filter="url(#sf-corona)"/>
+      </svg>`;
   }
 
   /* Chaleur de l'astre. Plutôt que des paliers, on interpole en continu sur
@@ -93,11 +216,17 @@ const Scene = (() => {
   const SUN_CORE_LOW = [255, 242, 207];   // #fff2cf
   const SUN_CORE_HIGH = [255, 251, 232];  // #fffbe8
 
-  function mixRgb(a, b, t) {
+  function mixArr(a, b, t) {
     const k = Math.max(0, Math.min(1, t));
-    return `rgb(${Math.round(a[0] + (b[0] - a[0]) * k)},
-                ${Math.round(a[1] + (b[1] - a[1]) * k)},
-                ${Math.round(a[2] + (b[2] - a[2]) * k)})`.replace(/\s+/g, '');
+    return [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * k));
+  }
+
+  function rgbStr(c) {
+    return `rgb(${c[0]},${c[1]},${c[2]})`;
+  }
+
+  function mixRgb(a, b, t) {
+    return rgbStr(mixArr(a, b, t));
   }
 
   function applySunLook(sun, s) {
@@ -108,17 +237,34 @@ const Scene = (() => {
       sun.style.setProperty('--sun-warm', '#cdd9f0');
       sun.style.setProperty('--ray-op', '0.12');
       sun.style.setProperty('--sun-scale', '0.62');
+      sun.style.setProperty('--sun-squash', '1');  // pas de réfraction visible
+      // Lumière lunaire : l'ourlet des nuages tire vers le bleu très pâle.
+      if (skyEl) skyEl.style.setProperty('--light-tint', '#e6ecf8');
       return;
     }
     // t = 0 quand le soleil rase l'horizon, 1 au-dessus de ~20°.
     const elev = isFinite(s.solarElev) ? s.solarElev : 30;
     const t = Math.max(0, Math.min(1, elev / 20));
-    sun.style.setProperty('--sun-core', mixRgb(SUN_CORE_LOW, SUN_CORE_HIGH, t));
-    sun.style.setProperty('--sun-warm', mixRgb(SUN_WARM_LOW, SUN_WARM_HIGH, t));
+    const core = mixArr(SUN_CORE_LOW, SUN_CORE_HIGH, t);
+    const warm = mixArr(SUN_WARM_LOW, SUN_WARM_HIGH, t);
+    sun.style.setProperty('--sun-core', rgbStr(core));
+    sun.style.setProperty('--sun-warm', rgbStr(warm));
+    /* Couleur de la LUMIÈRE qui frappe les nuages (v3.4.1). Sans elle,
+       --cloud-rim valait exactement --cloud-color : l'ourlet était seulement
+       ÉGAL au corps, jamais plus chaud, et les nuages du coucher paraissaient
+       délavés. On publie ici un ton à 45 % de chaleur du disque et 55 % de son
+       cœur : ≈ #fff0cc en plein jour, ≈ #ffc38e au ras de l'horizon. */
+    if (skyEl) {
+      skyEl.style.setProperty('--light-tint', rgbStr(mixArr(warm, core, 0.55)));
+    }
     // Les rayons s'estompent au ras de l'horizon (lumière rasante diffusée)
     // et le disque y paraît plus gros, comme dans la réalité.
     sun.style.setProperty('--ray-op', (0.55 + 0.45 * t).toFixed(2));
     sun.style.setProperty('--sun-scale', (1.18 - 0.18 * t).toFixed(2));
+    // Réfraction atmosphérique (v3.4) : au ras de l'horizon la lumière est
+    // courbée et le disque devient mesurablement ovale. C'est un détail que
+    // personne ne saurait nommer mais que tout le monde reconnaît.
+    sun.style.setProperty('--sun-squash', (0.82 + 0.18 * t).toFixed(2));
   }
 
   /* Bande d'horizon teintée par le biome survolé (océan, désert…). */

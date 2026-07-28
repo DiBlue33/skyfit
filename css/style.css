@@ -40,6 +40,26 @@ button {
   --sky-top: #4aa3e8;
   --sky-bottom: #bfe3ff;
   --cloud-color: #ffffff;
+  /* Dérivés v3.4. Sky.state() ne produit qu'UNE couleur de nuage ; les trois
+     tons du dégradé de lumière sont fabriqués ici, en color-mix, pour rester
+     continus quand le ciel change (une table de paliers ferait sauter la
+     palette exactement là où on a passé la v3.3 à l'éviter).
+
+     ⚠️ Le corps est légèrement tiré vers le bleu du ciel. C'est la leçon la
+     plus coûteuse de la maquette : avec un corps blanc PUR, l'ourlet n'a nulle
+     part où aller — rien n'est plus clair que le blanc — et tout le relief
+     s'écrase. Physiquement c'est juste, aussi : un nuage réel n'est pas blanc,
+     il renvoie le ciel.
+
+     ⚠️ Et symétriquement (v3.4.1) : l'ourlet ne doit pas valoir --cloud-color
+     tel quel, sinon il est seulement ÉGAL au corps et le coucher de soleil rend
+     délavé. Il emprunte sa chaleur à --light-tint, publié par Scene à chaque
+     changement de lumière (doré le jour, orangé au ras de l'horizon, bleuté
+     sous la lune). La valeur ci-dessous n'est qu'un repli avant le 1er tick. */
+  --light-tint:  #fff0cc;
+  --cloud-body:  color-mix(in srgb, var(--cloud-color) 84%, var(--sky-top));
+  --cloud-rim:   color-mix(in srgb, var(--cloud-color) 74%, var(--light-tint));
+  --cloud-shade: color-mix(in srgb, var(--cloud-color) 48%, var(--sky-top));
   --speed-factor: 1;
   --wind-factor: 1;
   --cloud-opacity: 1;
@@ -82,14 +102,18 @@ button {
   z-index: 0;
 }
 
-/* Astre solaire / lunaire (v3.3). Sa hauteur à l'écran suit la hauteur réelle
-   du soleil calculée par trigonométrie ; sa couleur, sa taille et l'intensité
-   de ses rayons sont interpolées en continu par Scene.applySunLook() via
-   --sun-core, --sun-warm, --ray-op et --sun-scale.
+/* Astre solaire / lunaire (refondu en v3.4). Sa hauteur à l'écran suit la
+   hauteur réelle du soleil calculée par trigonométrie ; sa couleur, sa taille,
+   l'intensité de sa couronne et son aplatissement sont interpolés en continu
+   par Scene.applySunLook() via --sun-core, --sun-warm, --ray-op, --sun-scale
+   et --sun-squash.
 
    ⚠️ Invariant de composition : #sun n'anime QUE `top` (transition). Les
-   animations en transform (rotation des rayons, respiration du halo) vivent
-   sur ses enfants, jamais sur lui — sinon elles s'écrasent mutuellement. */
+   animations en transform (rotation de la couronne, respiration du halo)
+   vivent sur ses enfants, jamais sur lui — sinon elles s'écrasent
+   mutuellement. Corollaire ajouté en v3.4 : .sun-core porte maintenant un
+   `transform: scaleY()` STATIQUE (la réfraction). Ne jamais lui donner
+   d'animation en transform, elle écraserait l'aplatissement. */
 #sun {
   position: absolute;
   /* Décalé vers la gauche par rapport à la v3.2 (18 %) : le nouvel astre est
@@ -102,60 +126,64 @@ button {
   --sun-warm: #ffd979;
   --ray-op: 1;
   --sun-scale: 1;
+  --sun-squash: 1;
   scale: var(--sun-scale);
   transition: top 3s ease, opacity 2s ease, scale 3s ease;
   pointer-events: none;
   z-index: 0;
 }
 
-/* Cœur : le disque lui-même, volontairement petit (30 % du conteneur) —
-   c'est le halo et les rayons qui donnent la présence. */
+/* Cœur : le disque, volontairement petit (26 % du conteneur) et brûlé de
+   blanc en son centre. Le bloom est fait de TROIS ombres portées de rayons
+   très différents plutôt que d'une seule : une lueur réelle décroît de façon
+   exponentielle, et une ombre unique donne toujours un bord perceptible.
+   Le scaleY est l'aplatissement par réfraction — voir l'invariant plus haut. */
 #sun .sun-core {
-  position: absolute; inset: 30%;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--sun-core) 0%, var(--sun-warm) 70%, transparent 100%);
-  box-shadow: 0 0 26px 6px color-mix(in srgb, var(--sun-warm) 70%, transparent);
-}
-
-/* Halo : la lueur diffuse autour du disque, qui respire lentement. */
-#sun .sun-halo {
-  position: absolute; inset: -70%;
+  position: absolute; inset: 37%;
   border-radius: 50%;
   background: radial-gradient(circle,
-    color-mix(in srgb, var(--sun-warm) 34%, transparent) 0%,
-    color-mix(in srgb, var(--sun-warm) 12%, transparent) 38%,
-    transparent 68%);
-  animation: sun-breathe 7s ease-in-out infinite;
+    #fff 0%, var(--sun-core) 46%, var(--sun-warm) 82%,
+    color-mix(in srgb, var(--sun-warm) 30%, transparent) 100%);
+  box-shadow:
+    0 0 14px 3px  color-mix(in srgb, var(--sun-core) 88%, transparent),
+    0 0 40px 12px color-mix(in srgb, var(--sun-warm) 52%, transparent),
+    0 0 92px 34px color-mix(in srgb, var(--sun-warm) 22%, transparent);
+  transform: scaleY(var(--sun-squash));
+  transition: transform 3s ease;
 }
 
-/* Rayons : un conic-gradient de fins secteurs clairs, masqué en radial pour
-   qu'ils s'estompent vers l'extérieur, et animé d'une rotation très lente
-   (90 s le tour) — on la perçoit sans jamais la trouver agitée. */
-#sun .sun-rays {
-  position: absolute; inset: -130%;
+/* Halo : le bloom atmosphérique. Cinq paliers pour approcher la décroissance
+   exponentielle de la lumière diffusée — le dernier est presque transparent
+   mais très large, c'est lui qui BLANCHIT le ciel autour de l'astre au lieu
+   de laisser un disque de brume au bord net. */
+#sun .sun-halo {
+  position: absolute; inset: -135%;
   border-radius: 50%;
-  background: conic-gradient(from 0deg,
-    color-mix(in srgb, var(--sun-core) 16%, transparent) 0deg 8deg, transparent 8deg 30deg,
-    color-mix(in srgb, var(--sun-core) 12%, transparent) 30deg 36deg, transparent 36deg 62deg,
-    color-mix(in srgb, var(--sun-core) 16%, transparent) 62deg 70deg, transparent 70deg 96deg,
-    color-mix(in srgb, var(--sun-core) 10%, transparent) 96deg 101deg, transparent 101deg 130deg,
-    color-mix(in srgb, var(--sun-core) 16%, transparent) 130deg 139deg, transparent 139deg 168deg,
-    color-mix(in srgb, var(--sun-core) 12%, transparent) 168deg 173deg, transparent 173deg 205deg,
-    color-mix(in srgb, var(--sun-core) 16%, transparent) 205deg 214deg, transparent 214deg 242deg,
-    color-mix(in srgb, var(--sun-core) 11%, transparent) 242deg 247deg, transparent 247deg 278deg,
-    color-mix(in srgb, var(--sun-core) 16%, transparent) 278deg 287deg, transparent 287deg 318deg,
-    color-mix(in srgb, var(--sun-core) 12%, transparent) 318deg 323deg, transparent 323deg 360deg);
-  -webkit-mask-image: radial-gradient(circle, #000 12%, rgba(0, 0, 0, .55) 34%, transparent 66%);
-  mask-image: radial-gradient(circle, #000 12%, rgba(0, 0, 0, .55) 34%, transparent 66%);
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--sun-core) 24%, transparent) 0%,
+    color-mix(in srgb, var(--sun-warm) 13%, transparent) 16%,
+    color-mix(in srgb, var(--sun-warm) 5%,  transparent) 34%,
+    color-mix(in srgb, var(--sun-warm) 2%,  transparent) 54%,
+    transparent 76%);
+  animation: sun-breathe 9s ease-in-out infinite;
+}
+
+/* Couronne : le SVG déformé par turbulence de Scene.coronaSvg(). Elle
+   remplace les secteurs nets de la v3.3 — c'est le changement qui fait
+   basculer l'astre de « dessin animé » à « photo ». Rotation en 150 s : assez
+   lente pour qu'on ne lise jamais une rotation, juste un frémissement. */
+#sun .sun-rays {
+  position: absolute; inset: -60%;
   opacity: var(--ray-op);
   transition: opacity 3s ease;
-  animation: sun-spin 90s linear infinite;
+  animation: sun-spin 150s linear infinite;
 }
+#sun .sun-rays svg { width: 100%; height: 100%; display: block; }
 
 @keyframes sun-spin { to { transform: rotate(360deg); } }
 @keyframes sun-breathe {
-  0%, 100% { transform: scale(1);    opacity: .92; }
-  50%      { transform: scale(1.09); opacity: 1; }
+  0%, 100% { transform: scale(1);     opacity: .9; }
+  50%      { transform: scale(1.035); opacity: 1; }
 }
 
 @media (max-width: 640px) {
