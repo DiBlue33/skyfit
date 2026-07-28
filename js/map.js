@@ -85,7 +85,7 @@ const WorldMap = (() => {
   let view = { cx: 0.5, cy: 0.42, zoom: 0 };
   let anim = null;                    // vue cible (déplacement fluide)
   let follow = null;                  // nom du pilote suivi (null = libre)
-  let showWind = true;
+  let showWind = true;                // les flèches de vent sont visibles d'entrée
   let overviewStep = 0;               // 0 → cadrer la route, 1 → cadrer le monde
 
   let canvas = null, ctx = null, rafId = null;
@@ -560,12 +560,29 @@ const WorldMap = (() => {
 
   /* --- Vents en altitude -------------------------------------- */
 
+  /**
+   * Les relevés de vent sont-ils utilisables pour la carte ?
+   * `Weather.info()` vaut null tant qu'aucun relevé n'est en cache, et
+   * `wrongRoute` signale un cache pris le long d'une AUTRE route : les flèches
+   * seraient alors placées n'importe où.
+   *
+   * ⚠️ v3.4.2 — le test d'origine était `if (!info || !info.ok || …) return;`
+   * or `Weather.info()` ne publie AUCUN champ `ok` (il expose fetchedAt, hours,
+   * routeId, wrongRoute, stale, error). `info.ok` valait donc toujours
+   * undefined, drawWind() sortait à chaque image, et le bouton 🌬️ semblait
+   * mort : c'est le bug signalé (« il ne se passe rien »). Ne pas réintroduire
+   * de test sur `.ok` ici — c'est `Weather.windAt()` qui porte ce champ.
+   */
+  function windReady() {
+    if (!CONFIG.WEATHER || !CONFIG.WEATHER.ENABLED) return false;
+    const info = Weather.info();
+    return !!info && !info.wrongRoute;
+  }
+
   function drawWind() {
-    if (!showWind || !CONFIG.WEATHER || !CONFIG.WEATHER.ENABLED) return;
+    if (!showWind || !windReady()) return;
     const me = State.current();
     if (!me) return;
-    const info = Weather.info();
-    if (!info || !info.ok || info.wrongRoute) return;
 
     const rid = Routes.active(me).id;
     const len = Routes.active(me).km || 1;
@@ -758,6 +775,7 @@ const WorldMap = (() => {
   function updateOverlay() {
     updateScale();
     computeReserved();
+    syncWindBtn();   // la dispo du vent change en cours de route (relevé, changement de ligne)
     const el = document.getElementById('map-flight');
     if (!el) return;
     const m = markers.find(x => x.me) || markers[0];
@@ -870,9 +888,18 @@ const WorldMap = (() => {
     if (b) b.classList.toggle('on', !!follow);
   }
 
+  /* Le bouton doit dire la vérité : allumé seulement si des flèches sont
+     réellement tracées, grisé quand il n'y a pas de relevé météo, et son
+     infobulle annonce ce que fera le PROCHAIN appui. */
   function syncWindBtn() {
     const b = document.getElementById('map-wind');
-    if (b) b.classList.toggle('on', showWind);
+    if (!b) return;
+    const ready = windReady();
+    b.classList.toggle('on', showWind && ready);
+    b.classList.toggle('off', !ready);
+    b.title = !ready
+      ? 'Vents en altitude indisponibles — relevé météo absent'
+      : (showWind ? 'Masquer les vents en altitude' : 'Afficher les vents en altitude');
   }
 
   /* ------------------------------------------------------------
@@ -973,7 +1000,22 @@ const WorldMap = (() => {
       syncFollowBtn();
       if (follow) flyTo(m.lon, m.lat, Math.max(view.zoom, 2.6));
     });
-    on('map-wind', () => { showWind = !showWind; syncWindBtn(); });
+    on('map-wind', () => {
+      showWind = !showWind;
+      syncWindBtn();
+      // Sans relevé, basculer ne change rien à l'écran : on le dit, et on
+      // relance une tentative de mise à jour plutôt que d'attendre le timer.
+      if (showWind && !windReady()) {
+        if (typeof UI !== 'undefined' && UI.toast) {
+          UI.toast('🌬️ Pas encore de relevé de vent pour cette route — mise à jour en cours…', 4000);
+        }
+        if (CONFIG.WEATHER && CONFIG.WEATHER.ENABLED) Weather.refresh(true);
+      }
+    });
+
+    // Un relevé qui arrive pendant que la carte est ouverte doit rallumer
+    // le bouton tout seul.
+    if (typeof Weather !== 'undefined' && Weather.onUpdate) Weather.onUpdate(syncWindBtn);
 
     bindGestures();
     window.addEventListener('resize', () => {

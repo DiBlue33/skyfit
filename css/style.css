@@ -1231,6 +1231,14 @@ button {
   color: #10243a;
 }
 
+/* Fonction momentanément sans données (ex. vents sans relevé météo) : le bouton
+   reste cliquable — l'appui relance un relevé — mais il annonce franchement
+   qu'il n'a rien à afficher plutôt que de paraître en panne. */
+#map-controls button.off {
+  opacity: 0.42;
+  filter: grayscale(1);
+}
+
 /* Échelle (bas gauche) */
 #map-scale {
   position: absolute;
