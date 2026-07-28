@@ -472,6 +472,13 @@ const CONFIG = {
   TICK_MS: 1000,             // tick temps réel (1 s)
 
   SAVE_KEY: 'skyfit_save_v1',
+
+  /* Tampon de cache des IMAGES. Le `?v=` posé sur les <script>/<link> dans
+     index.html ne protège que le code : les sprites d'avions sont chargés par
+     du JS, leur URL n'a pas de tampon, et un navigateur qui a déjà mis en cache
+     un PNG retouché continue d'afficher l'ancien. À incrémenter dès qu'un
+     fichier de assets/planes/ change. */
+  ASSET_V: '20260728b',
 };
 
 /* ------------------------------------------------------------

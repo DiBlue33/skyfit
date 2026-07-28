@@ -330,15 +330,18 @@ const Scene = (() => {
 
   function setPlane(planeId) {
     const def = CONFIG.PLANES.find(p => p.id === planeId) || CONFIG.PLANES[0];
+    // ?v= : les sprites sont retouchés de temps en temps (train rentré du
+    // TBM 700 en v3.4.1) et le cache du navigateur ne le voit pas autrement.
+    const av = CONFIG.ASSET_V ? '?v=' + CONFIG.ASSET_V : '';
     let html =
-      `<img class="plane-img" src="assets/planes/${def.id}.png" alt="${def.name}"
-            onerror="this.onerror=null;this.src='assets/planes/cessna.png'">`;
+      `<img class="plane-img" src="assets/planes/${def.id}.png${av}" alt="${def.name}"
+            onerror="this.onerror=null;this.src='assets/planes/cessna.png${av}'">`;
     // Hélice animée (spritesheet 3 frames superposée au sprite)
     if (def.prop) {
       html += `<div class="prop-overlay" style="
         left:${def.prop.left}%; top:${def.prop.top}%;
         width:${def.prop.width}%; height:${def.prop.height}%;
-        background-image:url('assets/planes/${def.id}_prop.png')"></div>`;
+        background-image:url('assets/planes/${def.id}_prop.png${av}')"></div>`;
     }
     plane.innerHTML = html;
     // Taille à l'écran proportionnelle à l'avion (bornée en pixels)
