@@ -82,35 +82,90 @@ button {
   z-index: 0;
 }
 
-/* Disque solaire / lunaire : sa hauteur à l'écran suit la hauteur réelle
-   du soleil calculée par trigonométrie. */
+/* Astre solaire / lunaire (v3.3). Sa hauteur à l'écran suit la hauteur réelle
+   du soleil calculée par trigonométrie ; sa couleur, sa taille et l'intensité
+   de ses rayons sont interpolées en continu par Scene.applySunLook() via
+   --sun-core, --sun-warm, --ray-op et --sun-scale.
+
+   ⚠️ Invariant de composition : #sun n'anime QUE `top` (transition). Les
+   animations en transform (rotation des rayons, respiration du halo) vivent
+   sur ses enfants, jamais sur lui — sinon elles s'écrasent mutuellement. */
 #sun {
   position: absolute;
-  right: 18%;
-  width: 58px; height: 58px;
-  margin-top: -29px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff6d8 0%, #ffd977 45%, rgba(255, 200, 90, 0) 72%);
-  box-shadow: 0 0 60px 24px rgba(255, 214, 130, 0.35);
-  transition: top 3s ease, opacity 2s ease;
+  /* Décalé vers la gauche par rapport à la v3.2 (18 %) : le nouvel astre est
+     nettement plus large, et à 18 % il passait entièrement derrière le panneau
+     du HUD dès que le soleil était haut. */
+  right: 34%;
+  width: 92px; height: 92px;
+  margin-top: -46px;
+  --sun-core: #fffbe8;
+  --sun-warm: #ffd979;
+  --ray-op: 1;
+  --sun-scale: 1;
+  scale: var(--sun-scale);
+  transition: top 3s ease, opacity 2s ease, scale 3s ease;
   pointer-events: none;
   z-index: 0;
 }
 
-#sun.moon {
-  background: radial-gradient(circle, #ffffff 0%, #dfe7f5 42%, rgba(200, 215, 240, 0) 70%);
-  box-shadow: 0 0 34px 10px rgba(200, 220, 255, 0.22);
-  width: 40px; height: 40px; margin-top: -20px;
+/* Cœur : le disque lui-même, volontairement petit (30 % du conteneur) —
+   c'est le halo et les rayons qui donnent la présence. */
+#sun .sun-core {
+  position: absolute; inset: 30%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--sun-core) 0%, var(--sun-warm) 70%, transparent 100%);
+  box-shadow: 0 0 26px 6px color-mix(in srgb, var(--sun-warm) 70%, transparent);
+}
+
+/* Halo : la lueur diffuse autour du disque, qui respire lentement. */
+#sun .sun-halo {
+  position: absolute; inset: -70%;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    color-mix(in srgb, var(--sun-warm) 34%, transparent) 0%,
+    color-mix(in srgb, var(--sun-warm) 12%, transparent) 38%,
+    transparent 68%);
+  animation: sun-breathe 7s ease-in-out infinite;
+}
+
+/* Rayons : un conic-gradient de fins secteurs clairs, masqué en radial pour
+   qu'ils s'estompent vers l'extérieur, et animé d'une rotation très lente
+   (90 s le tour) — on la perçoit sans jamais la trouver agitée. */
+#sun .sun-rays {
+  position: absolute; inset: -130%;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    color-mix(in srgb, var(--sun-core) 16%, transparent) 0deg 8deg, transparent 8deg 30deg,
+    color-mix(in srgb, var(--sun-core) 12%, transparent) 30deg 36deg, transparent 36deg 62deg,
+    color-mix(in srgb, var(--sun-core) 16%, transparent) 62deg 70deg, transparent 70deg 96deg,
+    color-mix(in srgb, var(--sun-core) 10%, transparent) 96deg 101deg, transparent 101deg 130deg,
+    color-mix(in srgb, var(--sun-core) 16%, transparent) 130deg 139deg, transparent 139deg 168deg,
+    color-mix(in srgb, var(--sun-core) 12%, transparent) 168deg 173deg, transparent 173deg 205deg,
+    color-mix(in srgb, var(--sun-core) 16%, transparent) 205deg 214deg, transparent 214deg 242deg,
+    color-mix(in srgb, var(--sun-core) 11%, transparent) 242deg 247deg, transparent 247deg 278deg,
+    color-mix(in srgb, var(--sun-core) 16%, transparent) 278deg 287deg, transparent 287deg 318deg,
+    color-mix(in srgb, var(--sun-core) 12%, transparent) 318deg 323deg, transparent 323deg 360deg);
+  -webkit-mask-image: radial-gradient(circle, #000 12%, rgba(0, 0, 0, .55) 34%, transparent 66%);
+  mask-image: radial-gradient(circle, #000 12%, rgba(0, 0, 0, .55) 34%, transparent 66%);
+  opacity: var(--ray-op);
+  transition: opacity 3s ease;
+  animation: sun-spin 90s linear infinite;
+}
+
+@keyframes sun-spin { to { transform: rotate(360deg); } }
+@keyframes sun-breathe {
+  0%, 100% { transform: scale(1);    opacity: .92; }
+  50%      { transform: scale(1.09); opacity: 1; }
 }
 
 @media (max-width: 640px) {
-  #sun { width: 42px; height: 42px; margin-top: -21px; right: 12%; }
-  #sun.moon { width: 30px; height: 30px; margin-top: -15px; }
+  #sun { width: 66px; height: 66px; margin-top: -33px; right: 26%; }
   #horizon { height: 18%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   #sky.sky-aurora::before { animation: none; }
+  #sun .sun-rays, #sun .sun-halo { animation: none; }
 }
 
 @keyframes aurora-drift {

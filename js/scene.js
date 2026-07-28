@@ -70,13 +70,55 @@ const Scene = (() => {
     }
   }
 
-  /* Disque solaire / lunaire : un seul élément, recoloré selon l'heure. */
+  /* Astre solaire / lunaire (v3.3) : plus un simple disque en dégradé mais
+     trois couches empilées — des rayons qui tournent très lentement, un halo
+     qui respire, et le cœur. Chaque couche a sa propre animation, sur son
+     propre élément : #sun ne fait que se déplacer (transition sur `top`),
+     ce qui préserve l'invariant de composition des animations. */
   function ensureSun() {
     if (sunEl || !skyEl) return sunEl;
     sunEl = document.createElement('div');
     sunEl.id = 'sun';
+    sunEl.innerHTML =
+      '<div class="sun-rays"></div><div class="sun-halo"></div><div class="sun-core"></div>';
     skyEl.appendChild(sunEl);
     return sunEl;
+  }
+
+  /* Chaleur de l'astre. Plutôt que des paliers, on interpole en continu sur
+     la hauteur du soleil : orangé rasant au ras de l'horizon, jaune franc au
+     zénith. La lune, elle, a sa propre teinte froide. */
+  const SUN_WARM_LOW = [255, 138, 61];    // #ff8a3d — soleil rasant
+  const SUN_WARM_HIGH = [255, 217, 121];  // #ffd979 — plein jour
+  const SUN_CORE_LOW = [255, 242, 207];   // #fff2cf
+  const SUN_CORE_HIGH = [255, 251, 232];  // #fffbe8
+
+  function mixRgb(a, b, t) {
+    const k = Math.max(0, Math.min(1, t));
+    return `rgb(${Math.round(a[0] + (b[0] - a[0]) * k)},
+                ${Math.round(a[1] + (b[1] - a[1]) * k)},
+                ${Math.round(a[2] + (b[2] - a[2]) * k)})`.replace(/\s+/g, '');
+  }
+
+  function applySunLook(sun, s) {
+    const isMoon = !s.sunVisible && s.moonVisible;
+    if (isMoon) {
+      // Lune : froide, petite, presque sans rayons — juste un halo diffus.
+      sun.style.setProperty('--sun-core', '#ffffff');
+      sun.style.setProperty('--sun-warm', '#cdd9f0');
+      sun.style.setProperty('--ray-op', '0.12');
+      sun.style.setProperty('--sun-scale', '0.62');
+      return;
+    }
+    // t = 0 quand le soleil rase l'horizon, 1 au-dessus de ~20°.
+    const elev = isFinite(s.solarElev) ? s.solarElev : 30;
+    const t = Math.max(0, Math.min(1, elev / 20));
+    sun.style.setProperty('--sun-core', mixRgb(SUN_CORE_LOW, SUN_CORE_HIGH, t));
+    sun.style.setProperty('--sun-warm', mixRgb(SUN_WARM_LOW, SUN_WARM_HIGH, t));
+    // Les rayons s'estompent au ras de l'horizon (lumière rasante diffusée)
+    // et le disque y paraît plus gros, comme dans la réalité.
+    sun.style.setProperty('--ray-op', (0.55 + 0.45 * t).toFixed(2));
+    sun.style.setProperty('--sun-scale', (1.18 - 0.18 * t).toFixed(2));
   }
 
   /* Bande d'horizon teintée par le biome survolé (océan, désert…). */
@@ -129,6 +171,7 @@ const Scene = (() => {
       if (visible) {
         sun.style.top = (s.sunY || 20).toFixed(1) + '%';
         sun.classList.toggle('moon', !s.sunVisible && s.moonVisible);
+        applySunLook(sun, s);
       }
     }
 
