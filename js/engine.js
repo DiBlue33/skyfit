@@ -46,6 +46,8 @@ const Engine = (() => {
     // 🗺️ Événements de route rencontrés pendant ce pas de simulation
     const routeEvents = noRouteEvents();
 
+    let airborneS = 0;   // temps réellement passé en l'air pendant ce pas
+
     while (remaining > 0) {
       const dt = Math.min(CONFIG.SIM_STEP_S, remaining);
       remaining -= dt;
@@ -69,6 +71,11 @@ const Engine = (() => {
         justCrashed = true;
         break;
       }
+
+      // 3 bis) Ce pas a été volé pour de bon : il compte dans les heures de
+      // vol qui font monter en grade (v3.5). Compté APRÈS le test de crash,
+      // donc rien ne s'accumule une fois l'avion au sol.
+      airborneS += dt;
 
       // 4) Distance parcourue pendant ce pas (vitesse air puis vitesse sol)
       const airspeed = CONFIG.speedAt(player.altitude, plane);
@@ -116,6 +123,7 @@ const Engine = (() => {
     // Effet moyen du vent sur la distance de ce pas de simulation
     const avgWind = windSumKm > 0 ? windSumRatio / windSumKm : 0;
 
+    player.flightSeconds = (player.flightSeconds || 0) + airborneS;
     player.totalKm += kmGained;
     player.lifetimeKm += kmGained;
     if (player.totalKm > player.bestKm) player.bestKm = player.totalKm;

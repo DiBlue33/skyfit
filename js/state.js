@@ -17,6 +17,7 @@ const State = (() => {
       totalKm: 0,                  // km de la TENTATIVE en cours (remis à 0 au crash)
       bestKm: 0,                   // record : meilleure tentative (classement général)
       lifetimeKm: 0,               // km cumulés à vie (source des points, jamais remis à 0)
+      flightSeconds: 0,            // temps réellement passé en l'air (base des grades, v3.5)
       points: 0,
       pointsSpent: 0,
       // Progression boutique
@@ -120,6 +121,17 @@ const State = (() => {
       if (typeof p.crashed !== 'boolean') p.crashed = false;
       if (typeof p.crashes !== 'number') p.crashes = 0;
       if (typeof p.lifetimeKm !== 'number') p.lifetimeKm = p.totalKm || 0;
+      // Heures de vol réelles (v3.5). Les profils antérieurs n'ont jamais
+      // compté leur temps en l'air : on l'estime à partir des km à vie, mais
+      // BORNÉ par l'âge du compte — on ne peut pas avoir volé plus longtemps
+      // que le profil n'existe. Sans ce plafond, un pilote de Concorde
+      // arriverait « déjà Légende » alors que l'échelle vise 6 mois.
+      if (typeof p.flightSeconds !== 'number' || !isFinite(p.flightSeconds) || p.flightSeconds < 0) {
+        const cruise = CONFIG.planeOf(p).cruise || 800;
+        const fromKm = ((p.lifetimeKm || 0) / cruise) * 3600;
+        const age = Math.max(0, Date.now() - (p.createdAt || p.lastTick || Date.now())) / 1000;
+        p.flightSeconds = Math.min(fromKm, age);
+      }
       if (typeof p.bestKm !== 'number') p.bestKm = p.totalKm || 0;
       // Code PIN (v1.4) : les anciens profils en créeront un à la connexion
       if (typeof p.pinHash !== 'string') p.pinHash = null;

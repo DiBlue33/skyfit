@@ -134,8 +134,9 @@ const Profile = (() => {
      ------------------------------------------------------------ */
 
   /**
-   * Progression vers le grade suivant : la plus contraignante des deux
-   * conditions (heures de vol / trajets) donne le pourcentage affiché.
+   * Progression vers le grade suivant : la plus contraignante des TROIS
+   * conditions (heures de vol / trajets / villes desservies) donne le
+   * pourcentage affiché — c'est elle qui décidera de la promotion.
    */
   function gradeProgress(p) {
     const next = CONFIG.nextGrade(p);
@@ -143,15 +144,19 @@ const Profile = (() => {
     const cur = CONFIG.GRADES[CONFIG.gradeIndex(p)];
     const h = CONFIG.flightHours(p);
     const t = CONFIG.tripsOf(p);
-    const ph = next.hours > cur.hours
-      ? (h - cur.hours) / (next.hours - cur.hours) : 1;
-    const pt = next.trips > cur.trips
-      ? (t - cur.trips) / (next.trips - cur.trips) : 1;
+    const c = CONFIG.citiesOf(p);
+    /* Part franchie entre le palier actuel et le suivant, sur un axe donné.
+       Un axe qui n'augmente pas d'un grade à l'autre est déjà acquis (1). */
+    const share = (val, from, to) => (to > from ? (val - from) / (to - from) : 1);
+    const ph = share(h, cur.hours, next.hours);
+    const pt = share(t, cur.trips, next.trips);
+    const pc = share(c, cur.cities || 0, next.cities || 0);
     return {
       next,
-      pct: Math.max(0, Math.min(100, Math.min(ph, pt) * 100)),
+      pct: Math.max(0, Math.min(100, Math.min(ph, pt, pc) * 100)),
       hoursLeft: Math.max(0, next.hours - h),
       tripsLeft: Math.max(0, next.trips - t),
+      citiesLeft: Math.max(0, (next.cities || 0) - c),
     };
   }
 
@@ -176,6 +181,7 @@ const Profile = (() => {
            Prochain grade : ${prog.next.icon} <b>${escapeHtml(prog.next.name)}</b> —
            ${prog.hoursLeft > 0 ? `encore ${hoursLabel(prog.hoursLeft)} de vol` : 'heures de vol ✔'}
            · ${prog.tripsLeft > 0 ? `${fmt(prog.tripsLeft)} trajet${prog.tripsLeft > 1 ? 's' : ''}` : 'trajets ✔'}
+           · ${prog.citiesLeft > 0 ? `${fmt(prog.citiesLeft)} nouvelle${prog.citiesLeft > 1 ? 's' : ''} ville${prog.citiesLeft > 1 ? 's' : ''}` : 'escales ✔'}
          </div>`
       : '<div class="pf-grade-next">🏆 Grade maximal atteint. Rien au-dessus, sinon les étoiles.</div>';
 
@@ -200,6 +206,7 @@ const Profile = (() => {
         <div class="pf-grade-stats">
           <span>🕐 ${hoursLabel(CONFIG.flightHours(p))} de vol</span>
           <span>🛬 ${fmt(CONFIG.tripsOf(p))} trajet${CONFIG.tripsOf(p) > 1 ? 's' : ''}</span>
+          <span>🌍 ${fmt(CONFIG.citiesOf(p))} ville${CONFIG.citiesOf(p) > 1 ? 's' : ''}</span>
         </div>
         ${gradeLine}
         <div class="pf-stamps-title">Qualifications machine — ${owned.length} / ${CONFIG.PLANES.length}</div>

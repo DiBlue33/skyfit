@@ -449,21 +449,41 @@ const CONFIG = {
   // reflet de la situation de vol réelle (position, heure solaire locale,
   // altitude, météo). Voir js/sky.js.
 
-  // --- Grades de pilote 🎫 (v2.8) ---
-  // Un grade se gagne quand LES DEUX conditions sont remplies : assez
-  // d'heures de vol (dérivées des km à vie) ET assez de trajets terminés.
-  // Voler beaucoup sur une même ligne ne suffit donc pas : il faut aussi
-  // ouvrir des routes et se poser.
-  GRADE_REF_SPEED: 800,      // km/h de référence pour convertir les km en heures
+  // --- Grades de pilote 🎫 (v2.8, refondu en v3.5) ---
+  // Un grade se gagne quand LES TROIS conditions sont remplies : assez
+  // d'heures de vol, assez de trajets terminés, et assez de villes
+  // DIFFÉRENTES desservies.
+  //
+  // ⚠️ v3.5 — pourquoi cette refonte. Jusqu'ici « heures de vol » valait
+  // lifetimeKm / 800 : ce n'était pas du temps mais de la distance déguisée.
+  // Mesuré sur le vrai moteur (voir sim_grades.js), un A320 régulier
+  // enregistrait ainsi 18 à 22 « heures » par journée réelle et un Concorde
+  // 58 — l'échelle récompensait l'avion possédé, pas l'assiduité, et
+  // Légende du ciel tombait en quelques semaines.
+  //
+  // Désormais une heure de grade = une heure réellement passée en l'air
+  // (player.flightSeconds, alimenté par Engine.simulate). Le plafond
+  // physique est donc 24 h par jour, et rien ne s'accumule quand l'avion
+  // est au sol après un crash. L'échelle devient un calendrier :
+  //   Pilote privé ½ journée · Copilote junior ~5 j · Confirmé ~2,5 sem.
+  //   Commandant de bord ~6 sem. · Instructeur ~2,5 mois
+  //   Chef pilote ~4 mois · Légende du ciel ~6 mois (4 300 h)
+  //
+  // Les trajets restent volontairement modestes : ils sont très inégaux
+  // selon la ligne (mesuré : 25,7 trajets/jour sur LFPG↔EGLL contre 0,53
+  // sur LFPG↔YSSY, soit un facteur 48). Le vrai second axe, lui, est neutre
+  // vis-à-vis de la longueur des lignes : le nombre de villes distinctes.
+  // Il pousse à ouvrir des routes, donc à dépenser des points, donc à faire
+  // du sport.
   GRADES: [
-    { id: 'eleve',      name: 'Élève-pilote',           icon: '🎓', hours: 0,    trips: 0 },
-    { id: 'prive',      name: 'Pilote privé',           icon: '🛩️', hours: 10,   trips: 2 },
-    { id: 'copi_jr',    name: 'Copilote junior',        icon: '🧑‍✈️', hours: 50,   trips: 10 },
-    { id: 'copi_conf',  name: 'Copilote confirmé',      icon: '✈️', hours: 150,  trips: 30 },
-    { id: 'cdb',        name: 'Commandant de bord',     icon: '🎖️', hours: 400,  trips: 75 },
-    { id: 'instructeur',name: 'Commandant instructeur', icon: '🏅', hours: 1000, trips: 150 },
-    { id: 'chef',       name: 'Chef pilote',            icon: '👑', hours: 2500, trips: 300 },
-    { id: 'legende',    name: 'Légende du ciel',        icon: '🌟', hours: 6000, trips: 600 },
+    { id: 'eleve',      name: 'Élève-pilote',           icon: '🎓', hours: 0,    trips: 0,  cities: 0 },
+    { id: 'prive',      name: 'Pilote privé',           icon: '🛩️', hours: 12,   trips: 2,  cities: 1 },
+    { id: 'copi_jr',    name: 'Copilote junior',        icon: '🧑‍✈️', hours: 110,  trips: 6,  cities: 3 },
+    { id: 'copi_conf',  name: 'Copilote confirmé',      icon: '✈️', hours: 400,  trips: 15, cities: 6 },
+    { id: 'cdb',        name: 'Commandant de bord',     icon: '🎖️', hours: 1000, trips: 30, cities: 10 },
+    { id: 'instructeur',name: 'Commandant instructeur', icon: '🏅', hours: 1800, trips: 50, cities: 15 },
+    { id: 'chef',       name: 'Chef pilote',            icon: '👑', hours: 2850, trips: 70, cities: 20 },
+    { id: 'legende',    name: 'Légende du ciel',        icon: '🌟', hours: 4300, trips: 90, cities: 26 },
   ],
 
   // --- Simulation ---
@@ -533,10 +553,18 @@ CONFIG.startAltFor = function (player) {
    Grades de pilote 🎫 (v2.8)
    ------------------------------------------------------------ */
 
-/** Heures de vol estimées : km à vie convertis à vitesse de référence. */
+/**
+ * Heures de vol RÉELLES : temps effectivement passé en l'air.
+ *
+ * ⚠️ Ne jamais revenir à un calcul dérivé de lifetimeKm (c'était le cas
+ * jusqu'en v3.5, avec GRADE_REF_SPEED) : la distance dépend de l'avion et
+ * de l'altitude, donc deux pilotes également assidus n'avançaient pas au
+ * même rythme sur l'échelle des grades. Ici le compteur est du temps, il
+ * ne peut pas dépasser 24 h par jour, et il s'arrête quand l'avion est au
+ * sol. Alimenté pas à pas par Engine.simulate().
+ */
 CONFIG.flightHours = function (player) {
-  const km = (player && player.lifetimeKm) || 0;
-  return km / CONFIG.GRADE_REF_SPEED;
+  return ((player && player.flightSeconds) || 0) / 3600;
 };
 
 /** Nombre de trajets terminés (arrivées à destination). */
@@ -544,12 +572,21 @@ CONFIG.tripsOf = function (player) {
   return (player && player.landings) || 0;
 };
 
+/** Nombre de villes DIFFÉRENTES desservies (neutre vis-à-vis des distances). */
+CONFIG.citiesOf = function (player) {
+  const v = player && player.visited;
+  return Array.isArray(v) ? v.length : 0;
+};
+
 /** Index du grade actuel dans CONFIG.GRADES (le plus haut atteint). */
 CONFIG.gradeIndex = function (player) {
   const h = CONFIG.flightHours(player);
   const t = CONFIG.tripsOf(player);
+  const c = CONFIG.citiesOf(player);
   let idx = 0;
-  CONFIG.GRADES.forEach((g, i) => { if (h >= g.hours && t >= g.trips) idx = i; });
+  CONFIG.GRADES.forEach((g, i) => {
+    if (h >= g.hours && t >= g.trips && c >= (g.cities || 0)) idx = i;
+  });
   return idx;
 };
 

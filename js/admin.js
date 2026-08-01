@@ -126,13 +126,24 @@ const Admin = (() => {
           kerosene: 200,
           crashed: false, crashes: 0,
           totalKm: 0, bestKm: 0, lifetimeKm: 0,
+          flightSeconds: 0,                       // heures de vol des grades (v3.5)
           points: 0, pointsSpent: 0, bonusPoints: 0,
           ownedPlanes: ['cessna'], currentPlane: 'cessna',
           upgrades: { yield: 0, aero: 0, tank: 0 },
           seenPhenomena: [],
+          // Réseau de routes : sans cette remise à zéro, un pilote « réinitialisé »
+          // gardait ses villes visitées et donc ses grades (v3.5).
+          ownedRoutes: [Routes.DEFAULT_ROUTE], currentRoute: Routes.DEFAULT_ROUTE,
+          pendingRoute: null, legKm: 0, legDir: 0,
+          visited: [], landings: 0, baseTouches: 0,
           activityLog: [], totalSportMinutes: 0,
           totalSessions: 0, maxAltitude: CONFIG.startAltFor({ currentPlane: 'cessna' }),
-          claimedAchievements: {},
+          claimedAchievements: {}, pinnedAchievements: [],
+          bestStreak: 0,
+          wheelLast: 0, wheelSpins: 0, wheelJackpots: 0,
+          questWeek: 0, questClaimed: {}, chainStep: {}, questAltMax: 0,
+          questsDone: 0, perfectWeeks: 0,
+          qsKm: 0, qsLandings: 0, qsBase: 0, qsSpent: 0, qsRoutes: 0, qsUpg: 0,
         });
         Scene.setPlane(p.currentPlane);
         Scene.setCondition(false, false);
