@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkyFit — Fais du sport, garde ton avion en vol !</title>
-  <link rel="stylesheet" href="css/style.css?v=20260728d">
+  <link rel="stylesheet" href="css/style.css?v=20260728e">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>✈️</text></svg>">
 </head>
 <body>
@@ -47,6 +47,7 @@
       <button class="btn ghost small" id="btn-achievements" type="button">🏆<span id="ach-badge"></span></button>
       <button class="btn ghost small" id="btn-journal" type="button">📒 Activités</button>
       <button class="btn small" id="btn-map" type="button">🗺️ Carte</button>
+      <button class="btn ghost small" id="btn-skills" type="button">🎓 Formation<span id="skills-badge"></span></button>
       <button class="btn warm small" id="btn-shop" type="button">🛒 Boutique</button>
     </div>
   </div>
@@ -138,6 +139,15 @@
           </div>
         </div>
         <div class="admin-section">
+          <h4>⚙ Roues dentées</h4>
+          <div class="admin-row">
+            <button class="btn small" data-admin="gears" data-val="10" type="button">+10</button>
+            <button class="btn small" data-admin="gears" data-val="50" type="button">+50</button>
+            <button class="btn small" data-admin="gears" data-val="336" type="button">+336 (arbre complet)</button>
+            <button class="btn small ghost" data-admin="gears-reset" type="button">Réinitialiser l'arbre</button>
+          </div>
+        </div>
+        <div class="admin-section">
           <h4>⛽ Kérosène</h4>
           <div class="admin-row">
             <button class="btn small" data-admin="kero" data-val="500" type="button">+500 L</button>
@@ -222,11 +232,25 @@
         <div class="shop-points-banner">★ <span id="shop-points">0</span> points disponibles</div>
         <div class="shop-tabs">
           <button class="shop-tab active" data-tab="planes" type="button">✈️ Avions</button>
-          <button class="shop-tab" data-tab="upgrades" type="button">⚙️ Améliorations</button>
+          <button class="shop-tab" data-tab="upgrades" type="button">🛠️ Améliorations</button>
           <button class="shop-tab" data-tab="routes" type="button">🗺️ Routes</button>
           <button class="shop-tab" data-tab="decors" type="button">🌅 Ciel</button>
         </div>
         <div id="shop-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale : arbre des compétences 🎓 -->
+  <div class="modal-backdrop" id="modal-skills">
+    <div class="modal wide">
+      <div class="modal-header">
+        <h2>🎓 Formation</h2>
+        <button class="modal-close" data-close="modal-skills" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="shop-points-banner" id="skills-summary"></div>
+        <div id="skills-body"></div>
       </div>
     </div>
   </div>
@@ -410,27 +434,28 @@
   <!-- Toast -->
   <div id="toast"></div>
 
-  <script src="js/config.js?v=20260728d"></script>
-  <script src="js/routes.js?v=20260728d"></script>
-  <script src="js/state.js?v=20260728d"></script>
-  <script src="js/streak.js?v=20260728d"></script>
-  <script src="js/engine.js?v=20260728d"></script>
-  <script src="js/weather.js?v=20260728d"></script>
-  <script src="js/scene.js?v=20260728d"></script>
-  <script src="js/sky.js?v=20260728d"></script>
-  <script src="js/ui.js?v=20260728d"></script>
-  <script src="js/weather-ui.js?v=20260728d"></script>
-  <script src="js/stats.js?v=20260728d"></script>
-  <script src="js/worlddata.js?v=20260728d"></script>
-  <script src="js/map.js?v=20260728d"></script>
-  <script src="js/achievements.js?v=20260728d"></script>
-  <script src="js/wheel.js?v=20260728d"></script>
-  <script src="js/profile.js?v=20260728d"></script>
-  <script src="js/quests.js?v=20260728d"></script>
-  <script src="js/sync-config.js?v=20260728d"></script>
-  <script src="js/sync.js?v=20260728d"></script>
-  <script src="js/auth.js?v=20260728d"></script>
-  <script src="js/admin.js?v=20260728d"></script>
-  <script src="js/main.js?v=20260728d"></script>
+  <script src="js/config.js?v=20260728e"></script>
+  <script src="js/routes.js?v=20260728e"></script>
+  <script src="js/skills.js?v=20260728e"></script>
+  <script src="js/state.js?v=20260728e"></script>
+  <script src="js/streak.js?v=20260728e"></script>
+  <script src="js/engine.js?v=20260728e"></script>
+  <script src="js/weather.js?v=20260728e"></script>
+  <script src="js/scene.js?v=20260728e"></script>
+  <script src="js/sky.js?v=20260728e"></script>
+  <script src="js/ui.js?v=20260728e"></script>
+  <script src="js/weather-ui.js?v=20260728e"></script>
+  <script src="js/stats.js?v=20260728e"></script>
+  <script src="js/worlddata.js?v=20260728e"></script>
+  <script src="js/map.js?v=20260728e"></script>
+  <script src="js/achievements.js?v=20260728e"></script>
+  <script src="js/wheel.js?v=20260728e"></script>
+  <script src="js/profile.js?v=20260728e"></script>
+  <script src="js/quests.js?v=20260728e"></script>
+  <script src="js/sync-config.js?v=20260728e"></script>
+  <script src="js/sync.js?v=20260728e"></script>
+  <script src="js/auth.js?v=20260728e"></script>
+  <script src="js/admin.js?v=20260728e"></script>
+  <script src="js/main.js?v=20260728e"></script>
 </body>
 </html>

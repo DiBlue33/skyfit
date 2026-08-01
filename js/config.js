@@ -107,6 +107,7 @@ const CONFIG = {
     wheel:       { icon: '🎡', name: 'Roue de la chance' },
     quest:       { icon: '🎯', name: 'Quête accomplie' },
     phenomenon:  { icon: '🌌', name: 'Phénomène observé' },
+    training:    { icon: '🎓', name: 'Formation validée' },
   },
 
   // --- Roue de la chance 🎡 ---
@@ -492,6 +493,13 @@ const CONFIG = {
   TICK_MS: 1000,             // tick temps réel (1 s)
 
   SAVE_KEY: 'skyfit_save_v1',
+
+  /* Grand reset (v3.6). L'arbre des compétences rebat toutes les cartes :
+     les deux pilotes repartent de zéro, à égalité. Tout profil dont le
+     `resetStamp` ne correspond pas est remis à zéro au chargement, une
+     seule fois — y compris s'il revient du cloud sur un autre appareil.
+     NE PAS changer cette valeur sans vouloir effacer les deux comptes. */
+  RESET_STAMP: '2026-07-28-arbre',
 
   /* Tampon de cache des IMAGES. Le `?v=` posé sur les <script>/<link> dans
      index.html ne protège que le code : les sprites d'avions sont chargés par

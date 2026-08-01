@@ -25,6 +25,17 @@ const UI = (() => {
     $('kero-fill').style.width = Math.min(100, (p.kerosene / cap) * 100) + '%';
     $('player-name').textContent = p.name;
 
+    // Pastille 🎓 : nombre de qualifications immédiatement payables
+    const sb = $('skills-badge');
+    if (sb) {
+      const n = Skills.all().filter(s =>
+        !Skills.isUnlocked(p, s.id) &&
+        !Skills.missing(p, s.id).length &&
+        Skills.available(p) >= s.cost).length;
+      sb.textContent = n;
+      sb.style.display = n > 0 ? 'flex' : 'none';
+    }
+
     // Bouton « fiche de pilote » : avatar choisi, sinon 👨‍✈️ / 👩‍✈️ par défaut
     // Depuis la v3.2 l'avatar peut être une photo découpée : on passe donc par
     // Profile.avatarHtml(), qui renvoie soit l'emoji, soit une balise <img>.
@@ -520,7 +531,9 @@ const UI = (() => {
       const isDisco = e.activityId === 'discovery';
       const isWheel = e.activityId === 'wheel';
       const isQuest = e.activityId === 'quest';
-      const isMeta = isAch || isDisco || isWheel || isQuest;
+      const isPhen = e.activityId === 'phenomenon';
+      const isTrain = e.activityId === 'training';
+      const isMeta = isAch || isDisco || isWheel || isQuest || isPhen || isTrain;
       const act = isAch
         ? { icon: e.achIcon || '🏆', name: `Succès « ${e.achName || '?'} »` }
         : isDisco
@@ -529,6 +542,10 @@ const UI = (() => {
         ? { icon: e.prizeIcon || '🎡', name: `Roue de la chance — ${e.prizeLabel || '?'}` }
         : isQuest
         ? { icon: e.questIcon || '🎯', name: `Quête « ${e.questName || '?'} »` }
+        : isPhen
+        ? { icon: e.cityIcon || '🌌', name: `Phénomène observé : ${e.phenomenonName || '?'}` }
+        : isTrain
+        ? { icon: '🎓', name: `Formation : ${e.label || '?'}` }
         : CONFIG.ACTIVITIES.find(a => a.id === e.activityId) ||
           (CONFIG.LEGACY_ACTIVITIES || {})[e.activityId] ||
           { icon: '💪', name: e.activityId };
@@ -546,8 +563,11 @@ const UI = (() => {
         ? `<span class="j-streak" title="${e.streak}e jour d'affilée">🔥${e.streak}</span>` : '';
       // Gains : litres, et points quand l'entrée en rapporte (roue 🎡)
       const gains = [];
-      if (e.kero > 0 || !e.pts) gains.push(`+${fmt(e.kero)} L ⛽`);
+      if (e.kero > 0 || (!e.pts && !e.points && !e.gears)) gains.push(`+${fmt(e.kero)} L ⛽`);
       if (e.pts > 0) gains.push(`+${fmt(e.pts)} ★`);
+      if (e.points > 0) gains.push(`+${fmt(e.points)} ★`);
+      // Roues dentées : gagnées (découverte, phénomène) ou investies (formation)
+      if (e.gears > 0) gains.push(isTrain ? `−${fmt(e.gears)} ⚙` : `+${fmt(e.gears)} ⚙`);
       html += `
         <div class="journal-row ${mine ? 'me' : ''}">
           <span class="j-time">${time}</span>
@@ -573,8 +593,13 @@ const UI = (() => {
         const owned = p.ownedPlanes.includes(plane.id);
         const current = p.currentPlane === plane.id;
         const canBuy = State.availablePoints(p) >= plane.cost;
+        // Verrou de qualification de type (v3.6) : sans la QT, l'appareil
+        // reste au hangar quel que soit le nombre de points.
+        const qt = Skills.qtFor(plane.id);
+        const rated = Skills.canFly(p, plane.id);
         let btn;
-        if (current) btn = `<button class="btn small ghost" disabled type="button">En vol ✓</button>`;
+        if (!rated) btn = `<button class="btn small ghost" disabled type="button">🔒 QT requise</button>`;
+        else if (current) btn = `<button class="btn small ghost" disabled type="button">En vol ✓</button>`;
         else if (owned) btn = `<button class="btn small" data-buy-plane="${plane.id}" type="button">Piloter</button>`;
         else btn = `<button class="btn small warm" data-buy-plane="${plane.id}" ${canBuy ? '' : 'disabled'} type="button">★ ${fmt(plane.cost)}</button>`;
         // Fiche technique : croisière et plafond réels, plus l'écart de vitesse
@@ -591,7 +616,11 @@ const UI = (() => {
         const specs = `<div class="plane-specs">` +
           `<span>🛫 ${fmt(plane.cruise)} km/h</span>` +
           `<span>⛰️ ${fmt(plane.ceiling)} ft</span>${delta}</div>`;
-        return shopItem(plane.name, plane.desc + specs, current ? 'owned-current' : '', btn);
+        const gate = (!rated && qt)
+          ? `<div class="plane-gate">🎓 Nécessite <b>${escapeHtml(qt.name)}</b> — à débloquer dans Formation</div>`
+          : '';
+        return shopItem(plane.name, plane.desc + specs + gate,
+          (current ? 'owned-current' : '') + (rated ? '' : ' locked'), btn);
       }).join('');
     } else if (shopTab === 'upgrades') {
       html = CONFIG.UPGRADES.map(up => {
@@ -752,6 +781,84 @@ const UI = (() => {
       items;
   }
 
+  /* ---------- Arbre des compétences 🎓 (v3.6) ---------- */
+
+  function refreshSkills() {
+    const p = State.current();
+    if (!p) return;
+    const prog = Skills.progress(p);
+    const avail = Skills.available(p);
+
+    $('skills-summary').innerHTML =
+      `⚙ <b>${fmt(avail)}</b> roue${avail > 1 ? 's' : ''} dentée${avail > 1 ? 's' : ''} disponible${avail > 1 ? 's' : ''}` +
+      ` <span class="skills-sub">— ${prog.unlocked} / ${prog.total} qualifications` +
+      ` · ${fmt(prog.spent)} / ${fmt(prog.cost)} investies</span>`;
+
+    let html = `
+      <div class="shop-note">
+        ⚙ Les roues dentées ne s'achètent pas avec des points : elles se
+        <b>gagnent en explorant</b> — une première escale (2 à 6 selon la région),
+        un avion débloqué (+10), un phénomène céleste observé (+5), et un gros
+        bonus quand les ${Routes.all().length} destinations ont été visitées.
+        Piloter un appareil demande <b>sa qualification de type ici</b> <i>et</i>
+        son prix en points à la boutique.
+      </div>`;
+
+    let lastRow = -1;
+    Skills.groups().forEach(g => {
+      if (g.row !== lastRow) {
+        if (lastRow >= 0) html += '</div>';
+        html += '<div class="skill-row">';
+        lastRow = g.row;
+      }
+      html += `<div class="skill-col"><div class="skill-col-title">${g.icon} ${escapeHtml(g.title)}</div>`;
+      g.nodes.forEach(n => { html += skillNodeHtml(p, n); });
+      html += '</div>';
+    });
+    if (lastRow >= 0) html += '</div>';
+
+    $('skills-body').innerHTML = html;
+    $('skills-body').querySelectorAll('[data-unlock]').forEach(b =>
+      b.addEventListener('click', () => {
+        const res = Skills.unlock(p, b.dataset.unlock);
+        if (res.ok) {
+          const n = res.node;
+          const plane = n.grants ? CONFIG.planeById(n.grants) : null;
+          toast(plane
+            ? `🎓 <b>${escapeHtml(n.name)}</b> obtenue ! Le ${escapeHtml(plane.name)} est désormais achetable en boutique. 🛒`
+            : `🎓 <b>${escapeHtml(n.name)}</b> validée !`, 5200);
+        } else if (res.reason === 'roues') {
+          toast('⚙ Pas assez de roues dentées — pars découvrir une nouvelle escale !');
+        }
+        refreshSkills(); refreshHUD();
+      }));
+  }
+
+  function skillNodeHtml(p, n) {
+    const done = Skills.isUnlocked(p, n.id);
+    const miss = Skills.missing(p, n.id);
+    const ready = !done && !miss.length;
+    const afford = ready && Skills.available(p) >= n.cost;
+    const cls = done ? 'done' : ready ? 'ready' : 'locked';
+
+    let btn;
+    if (done) btn = `<span class="skill-check">✓</span>`;
+    else if (!ready) btn = `<span class="skill-lock" title="Prérequis : ${escapeHtml(miss.map(m => m.name).join(', '))}">🔒</span>`;
+    else btn = `<button class="btn small ${afford ? 'warm' : 'ghost'}" data-unlock="${n.id}" ${afford ? '' : 'disabled'} type="button">⚙ ${n.cost}</button>`;
+
+    const grants = n.grants && CONFIG.planeById(n.grants)
+      ? `<div class="skill-grants">✈️ Débloque l'achat du ${escapeHtml(CONFIG.planeById(n.grants).name)}</div>` : '';
+    const desc = n.desc ? `<div class="skill-desc">${escapeHtml(n.desc)}</div>` : '';
+    return `
+      <div class="skill-node ${cls} ${n.kind}">
+        <div class="skill-info">
+          <div class="skill-name">${n.icon} ${escapeHtml(n.name)}</div>
+          ${desc}${grants}
+        </div>
+        ${btn}
+      </div>`;
+  }
+
   function shopItem(name, desc, cls, btnHtml) {
     return `
       <div class="shop-item ${cls}">
@@ -851,6 +958,11 @@ const UI = (() => {
       openModal('modal-journal');
     });
 
+    $('btn-skills').addEventListener('click', () => {
+      refreshSkills();
+      openModal('modal-skills');
+    });
+
     $('btn-wheel').addEventListener('click', () => Wheel.open());
     document.querySelectorAll('.shop-tab').forEach(tab =>
       tab.addEventListener('click', () => { shopTab = tab.dataset.tab; refreshShop(); }));
@@ -883,7 +995,7 @@ const UI = (() => {
     $('btn-switch-player').addEventListener('click', () => Auth.logout());
   }
 
-  return { bind, refreshHUD, refreshShop, refreshScoreboard, toast,
+  return { bind, refreshHUD, refreshShop, refreshSkills, refreshScoreboard, toast,
            offlineSummary, keroseneRain, streakReminder, flightEvents,
            setScoreOpen, toggleScore };
 })();

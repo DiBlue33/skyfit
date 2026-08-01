@@ -101,7 +101,22 @@ const Admin = (() => {
       case 'unlock-all':
         p.ownedPlanes = CONFIG.PLANES.map(pl => pl.id);
         CONFIG.UPGRADES.forEach(u => { p.upgrades[u.id] = u.maxLevel; });
+        p.skills = Skills.all().map(s => s.id);
         UI.toast('🔧 Tout est débloqué !');
+        break;
+
+      case 'gears':
+        p.gears = (p.gears || 0) + n;
+        UI.toast(`🔧 +${fmt(n)} ⚙ roues dentées`);
+        break;
+
+      case 'gears-reset':
+        p.gears = 0;
+        p.gearsSpent = 0;
+        p.gearCapstone = 0;
+        p.skills = ['ppl'];
+        p.currentPlane = 'cessna';
+        UI.toast('🔧 Arbre des compétences remis à zéro');
         break;
 
       case 'delete-player': {
@@ -119,32 +134,9 @@ const Admin = (() => {
 
       case 'reset-player':
         if (!confirm(`Réinitialiser complètement le pilote « ${p.name} » ?`)) return;
-        // Repart de zéro en conservant le nom
-        Object.assign(p, {
-          lastTick: Date.now(),
-          altitude: CONFIG.startAltFor({ currentPlane: 'cessna' }),
-          kerosene: 200,
-          crashed: false, crashes: 0,
-          totalKm: 0, bestKm: 0, lifetimeKm: 0,
-          flightSeconds: 0,                       // heures de vol des grades (v3.5)
-          points: 0, pointsSpent: 0, bonusPoints: 0,
-          ownedPlanes: ['cessna'], currentPlane: 'cessna',
-          upgrades: { yield: 0, aero: 0, tank: 0 },
-          seenPhenomena: [],
-          // Réseau de routes : sans cette remise à zéro, un pilote « réinitialisé »
-          // gardait ses villes visitées et donc ses grades (v3.5).
-          ownedRoutes: [Routes.DEFAULT_ROUTE], currentRoute: Routes.DEFAULT_ROUTE,
-          pendingRoute: null, legKm: 0, legDir: 0,
-          visited: [], landings: 0, baseTouches: 0,
-          activityLog: [], totalSportMinutes: 0,
-          totalSessions: 0, maxAltitude: CONFIG.startAltFor({ currentPlane: 'cessna' }),
-          claimedAchievements: {}, pinnedAchievements: [],
-          bestStreak: 0,
-          wheelLast: 0, wheelSpins: 0, wheelJackpots: 0,
-          questWeek: 0, questClaimed: {}, chainStep: {}, questAltMax: 0,
-          questsDone: 0, perfectWeeks: 0,
-          qsKm: 0, qsLandings: 0, qsBase: 0, qsSpent: 0, qsRoutes: 0, qsUpg: 0,
-        });
+        // Un seul point de vérité : State.resetPlayer() reconstruit un profil
+        // neuf à partir de newPlayer(), donc aucun champ ne peut être oublié.
+        State.resetPlayer(p);
         Scene.setPlane(p.currentPlane);
         Scene.setCondition(false, false);
         UI.toast('🔧 Pilote réinitialisé');

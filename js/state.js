@@ -58,12 +58,46 @@ const State = (() => {
       qsSpent: 0,                  //                       points dépensés
       qsRoutes: 0,                 //                       lignes possédées
       qsUpg: 0,                    //                       niveaux d'améliorations
+      // Arbre des compétences 🎓 (v3.6) — monnaie séparée des points
+      gears: 0,                    // roues dentées gagnées (exploration)
+      gearsSpent: 0,               // roues dentées investies dans l'arbre
+      gearCapstone: 0,             // 1 = bonus « toutes les destinations » encaissé
+      skills: ['ppl'],             // qualifications débloquées (PPL offerte)
+      resetStamp: CONFIG.RESET_STAMP, // marqueur du dernier grand reset
       // Fiche de pilote 🎫 (v2.8)
       avatar: '',                  // emoji choisi ('' = valeur par défaut selon le nom)
       callsign: '',                // indicatif radio libre, ex. « SKY01 »
       pinnedAchievements: [],      // 3 succès épinglés sur la vitrine
       claimedAchievements: {},     // id de succès -> date de réclamation
     };
+  }
+
+  /**
+   * Remise à zéro complète d'un pilote (v3.6).
+   *
+   * Volontairement écrit comme « reconstruire un profil neuf puis
+   * réinjecter ce qui appartient à la personne » plutôt que comme une
+   * liste de champs à effacer : en v3.5, une liste manuelle avait
+   * oublié `visited`, et le pilote « réinitialisé » gardait ses grades.
+   * Ici, tout nouveau champ ajouté à newPlayer() est remis à zéro
+   * automatiquement — l'oubli devient impossible.
+   *
+   * Sont conservés : le nom, le code PIN, l'avatar, l'indicatif et la
+   * date de création (l'ancienneté du compte n'est pas un acquis de jeu).
+   */
+  function resetPlayer(p) {
+    if (!p) return null;
+    const keep = {
+      name: p.name,
+      pinHash: p.pinHash || null,
+      avatar: p.avatar || '',
+      callsign: p.callsign || '',
+      createdAt: p.createdAt || Date.now(),
+    };
+    Object.keys(p).forEach(k => { delete p[k]; });
+    Object.assign(p, newPlayer(keep.name), keep);
+    p.updatedAt = Date.now();
+    return p;
   }
 
   let data = null; // { players: {name -> player}, currentPlayer: name|null }
@@ -90,6 +124,16 @@ const State = (() => {
     const planeIds = CONFIG.PLANES.map(p => p.id);
     const routeIds = Routes.all().map(r => r.id);
     Object.values(data.players).forEach(p => {
+      // ---- Grand reset de la v3.6 -------------------------------
+      // L'arbre des compétences change l'économie de fond en comble :
+      // Diégo et Jade repartent de zéro, à égalité. Le marqueur rend
+      // l'opération idempotente et la fait suivre par la synchro : un
+      // profil qui revient du cloud sans le bon tampon est remis à
+      // zéro à son tour, sur n'importe quel appareil.
+      if (CONFIG.RESET_STAMP && p.resetStamp !== CONFIG.RESET_STAMP) {
+        resetPlayer(p);
+        console.info('SkyFit — grand reset appliqué à', p.name, CONFIG.RESET_STAMP);
+      }
       // Listes potentiellement perdues/déformées par Firebase
       if (!Array.isArray(p.activityLog)) {
         p.activityLog = p.activityLog ? Object.values(p.activityLog) : [];
@@ -166,6 +210,21 @@ const State = (() => {
         p.pinnedAchievements = p.pinnedAchievements ? Object.values(p.pinnedAchievements) : [];
       }
       p.pinnedAchievements = p.pinnedAchievements.filter(id => typeof id === 'string').slice(0, 3);
+      // Arbre des compétences (v3.6) — Firebase supprime les listes vides,
+      // mais celle-ci ne l'est jamais : le PPL y figure toujours.
+      if (!Array.isArray(p.skills)) {
+        p.skills = p.skills ? Object.values(p.skills) : [];
+      }
+      p.skills = p.skills.filter(id => typeof id === 'string' && Skills.byId(id));
+      if (p.skills.indexOf('ppl') < 0) p.skills.unshift('ppl');
+      if (typeof p.gears !== 'number' || !isFinite(p.gears) || p.gears < 0) p.gears = 0;
+      if (typeof p.gearsSpent !== 'number' || !isFinite(p.gearsSpent) || p.gearsSpent < 0) {
+        p.gearsSpent = 0;
+      }
+      if (typeof p.gearCapstone !== 'number') p.gearCapstone = p.gearCapstone ? 1 : 0;
+      // Un avion possédé sans sa qualification de type reste au hangar :
+      // on ne le retire pas (il a été payé) mais on ne le laisse pas voler.
+      if (!Skills.canFly(p, p.currentPlane)) p.currentPlane = 'cessna';
       // Réseau de routes (v2.3)
       migrateRoutes(p, routeIds);
       // Plafond propre à chaque avion (v2.6) : un profil qui volait au-dessus
@@ -322,7 +381,7 @@ const State = (() => {
   }
 
   return {
-    load, save, raw, migrate, addPlayer, selectPlayer, current, allPlayers,
+    load, save, raw, migrate, resetPlayer, addPlayer, selectPlayer, current, allPlayers,
     playerNames, availablePoints, tankCapacity, keroYield, decayFactor, airspeed, ceiling,
   };
 })();

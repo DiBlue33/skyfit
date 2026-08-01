@@ -113,8 +113,12 @@ const Engine = (() => {
             player.visited.push(city);
             const bonus = arrivalBonus(player, city);
             player.kerosene = Math.min(State.tankCapacity(player), player.kerosene + bonus);
-            routeEvents.firstVisits.push({ city, kero: bonus });
-            logDiscovery(player, city, bonus, simTime);
+            // ⚙ Roues dentées : la découverte finance l'arbre des compétences
+            // (v3.6). awardCity() encaisse aussi le bonus « toutes les
+            // destinations » si cette arrivée était la dernière du catalogue.
+            const gears = Skills.awardCity(player, city);
+            routeEvents.firstVisits.push({ city, kero: bonus, gears });
+            logDiscovery(player, city, bonus, simTime, gears);
           }
         });
       }
@@ -154,13 +158,14 @@ const Engine = (() => {
   }
 
   /** Trace la découverte dans le journal partagé (visible par l'autre pilote). */
-  function logDiscovery(player, city, kero, ts) {
+  function logDiscovery(player, city, kero, ts, gears) {
     const r = Routes.byCity(city);
     if (!Array.isArray(player.activityLog)) player.activityLog = [];
     player.activityLog.push({
       activityId: 'discovery',
       minutes: 0,
       kero: Math.round(kero),
+      gears: gears || 0,
       date: (typeof ts === 'number' && isFinite(ts)) ? ts : Date.now(),
       loggedAt: Date.now(),
       city: city,
@@ -386,10 +391,16 @@ const Engine = (() => {
   function buyPlane(player, planeId) {
     const plane = CONFIG.PLANES.find(p => p.id === planeId);
     if (!plane) return false;
+    // Double verrou (v3.6) : la qualification de type s'obtient dans l'arbre
+    // des compétences (roues dentées, donc exploration), l'appareil se paie
+    // en points (donc en kilomètres, donc en sport). Les deux axes sont
+    // indépendants : impossible de sauter au Concorde en accumulant des km.
+    if (!Skills.canFly(player, planeId)) return false;
     if (!player.ownedPlanes.includes(planeId)) {
       if (State.availablePoints(player) < plane.cost) return false;
       player.pointsSpent += plane.cost;
       player.ownedPlanes.push(planeId);
+      Skills.awardPlane(player, planeId);   // ⚙ premier déblocage
     }
     // Changement d'appareil : on conserve la position RELATIVE dans l'enveloppe
     // (le pourcentage du plafond), pas l'altitude absolue. Sinon passer d'un

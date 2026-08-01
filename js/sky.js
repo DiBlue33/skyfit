@@ -438,20 +438,23 @@ const Sky = (() => {
         ? State.tankCapacity(player) : CONFIG.KERO_TANK_MAX;
       player.kerosene = Math.min(cap, (player.kerosene || 0) + def.kero);
       player.bonusPoints = (player.bonusPoints || 0) + def.points;
-      logPhenomenon(player, def, ts);
+      // ⚙ Roues dentées : observer le ciel fait avancer la formation (v3.6)
+      const gears = (typeof Skills !== 'undefined') ? Skills.awardPhenomenon(player) : 0;
+      logPhenomenon(player, def, ts, gears);
       found.push(def);
     });
     return found;
   }
 
   /** Trace l'observation dans le journal partagé. */
-  function logPhenomenon(player, def, ts) {
+  function logPhenomenon(player, def, ts, gears) {
     if (!Array.isArray(player.activityLog)) player.activityLog = [];
     player.activityLog.push({
       activityId: 'phenomenon',
       minutes: 0,
       kero: def.kero,
       points: def.points,
+      gears: gears || 0,
       date: (typeof ts === 'number' && isFinite(ts)) ? ts : Date.now(),
       loggedAt: Date.now(),
       phenomenon: def.id,
