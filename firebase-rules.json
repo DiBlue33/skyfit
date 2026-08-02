@@ -1,0 +1,68 @@
+/* ============================================================
+   SkyFit — règles de sécurité du Realtime Database
+   ------------------------------------------------------------
+   À coller dans : console Firebase → Realtime Database →
+   onglet « Règles » → Publier.
+
+   POURQUOI CE FICHIER EXISTE
+   Le mode test créé avec la base ouvre TOUT à la racine et
+   EXPIRE à une date fixe. Le jour de l'expiration, ce n'est pas
+   seulement les notifications qui s'arrêtent : le jeu entier
+   cesse de se synchroniser entre les deux téléphones. Ces
+   règles-ci n'expirent jamais.
+
+   CE QU'ELLES FONT
+   Elles ferment la racine et n'ouvrent que les quatre nœuds
+   réellement utilisés. Quelqu'un qui devinerait l'URL de la base
+   ne peut donc plus y créer n'importe quoi ailleurs.
+
+   CE QU'ELLES NE FONT PAS
+   SkyFit n'a pas de compte Firebase : le code à 4 chiffres garde
+   l'entrée du jeu, pas la base. Tout ce qu'un navigateur doit
+   lire ou écrire est donc forcément ouvert. C'est le prix du
+   « zéro serveur, zéro euro ».
+
+   VARIANTE VERROUILLÉE (facultative)
+   Console Firebase → Paramètres du projet → Comptes de service →
+   Secrets de base de données : copiez le secret dans un secret
+   GitHub nommé FIREBASE_SECRET. L'émetteur s'en sert alors pour
+   contourner les règles, et vous pouvez passer les deux ".read"
+   de "push" et "notify" à false ci-dessous : plus personne ne
+   pourra lire les abonnements aux notifications.
+   ============================================================ */
+
+{
+  "rules": {
+    // Tout ce qui n'est pas nommé ci-dessous est refusé.
+    ".read": false,
+    ".write": false,
+
+    // Les profils pilotes : lus et écrits par les deux navigateurs.
+    "players": {
+      ".read": true,
+      "$pilote": { ".write": true }
+    },
+
+    // Pierres tombales des profils supprimés, pour qu'une
+    // suppression sur un téléphone ne revienne pas depuis l'autre.
+    "deleted": {
+      ".read": true,
+      "$pilote": { ".write": true }
+    },
+
+    // Abonnements aux notifications : écrits par le téléphone,
+    // lus par l'émetteur (GitHub Actions).
+    // Avec FIREBASE_SECRET, passez ce ".read" à false.
+    "push": {
+      ".read": true,
+      "$pilote": { ".write": true }
+    },
+
+    // Verrous anti-spam de l'émetteur. Aucun navigateur n'y touche.
+    // Avec FIREBASE_SECRET, passez ce ".read" à false.
+    "notify": {
+      ".read": true,
+      "$pilote": { ".write": true }
+    }
+  }
+}

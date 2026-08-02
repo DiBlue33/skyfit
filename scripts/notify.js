@@ -65,23 +65,52 @@ function readVapidPublic() {
    2. Accès à la base
    ------------------------------------------------------------ */
 
+/* Le secret de base (facultatif) permet de VERROUILLER /push et /notify
+   côté règles Firebase tout en laissant cet émetteur y accéder : un
+   accès porteur du secret contourne les règles. Sans lui, ces deux
+   nœuds doivent rester lisibles publiquement (voir firebase-rules.json). */
+const SECRET = process.env.FIREBASE_SECRET || '';
+const url = (db, node) =>
+  `${db}/${node}.json` + (SECRET ? `?auth=${encodeURIComponent(SECRET)}` : '');
+
+/** Traduit un échec Firebase en phrase actionnable plutôt qu'en pile d'appels. */
+function explain(node, status) {
+  if (status === 401) {
+    return `Firebase refuse l'accès à « ${node} » (HTTP 401 = permission ` +
+      `refusée par les règles de sécurité).\n` +
+      `  → Console Firebase → Realtime Database → onglet Règles.\n` +
+      `  → « ${node} » doit y être lisible, ou définissez le secret ` +
+      `FIREBASE_SECRET.\n` +
+      `  → Le fichier firebase-rules.json à la racine du dépôt contient des ` +
+      `règles prêtes à coller.`;
+  }
+  if (status === 404) {
+    return `Firebase ne connaît pas cette base (HTTP 404) — vérifiez ` +
+      `databaseURL dans js/sync-config.js.`;
+  }
+  return `GET ${node} → HTTP ${status}`;
+}
+
 async function get(db, node) {
-  const res = await fetch(`${db}/${node}.json`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`GET ${node} → HTTP ${res.status}`);
+  const res = await fetch(url(db, node), { cache: 'no-store' });
+  if (!res.ok) throw new Error(explain(node, res.status));
   return (await res.json()) || {};
 }
 
 async function put(db, node, value) {
   if (DRY) return true;
-  const res = await fetch(`${db}/${node}.json`, {
+  const res = await fetch(url(db, node), {
     method: 'PUT', body: JSON.stringify(value),
   });
+  // Une écriture refusée casse l'anti-spam mais pas l'envoi : on le dit
+  // fort plutôt que d'échouer, sinon plus personne n'est prévenu de rien.
+  if (!res.ok) console.log(`· ⚠️ écriture refusée sur ${node} (HTTP ${res.status})`);
   return res.ok;
 }
 
 async function del(db, node) {
   if (DRY) return true;
-  const res = await fetch(`${db}/${node}.json`, { method: 'DELETE' });
+  const res = await fetch(url(db, node), { method: 'DELETE' });
   return res.ok;
 }
 
@@ -306,4 +335,9 @@ async function main() {
   console.log(`${sent} notification(s) envoyée(s).`);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch(e => {
+  // Une pile d'appels n'apprend rien à personne ici : le message d'explain()
+  // dit quoi faire, on l'affiche seul.
+  console.error('\n❌ ' + ((e && e.message) || e) + '\n');
+  process.exit(1);
+});

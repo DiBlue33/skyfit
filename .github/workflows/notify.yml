@@ -43,6 +43,10 @@ jobs:
     env:
       TZ: Europe/Paris
       VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+      # Facultatif. S'il est défini, l'émetteur contourne les règles
+      # Firebase et /push comme /notify peuvent être fermés en lecture
+      # publique (voir firebase-rules.json). Absent = accès anonyme.
+      FIREBASE_SECRET: ${{ secrets.FIREBASE_SECRET }}
 
     steps:
       - uses: actions/checkout@v4
