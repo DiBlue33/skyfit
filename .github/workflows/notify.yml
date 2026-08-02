@@ -1,0 +1,58 @@
+# ============================================================
+#  SkyFit — Réveil horaire pour les notifications
+# ------------------------------------------------------------
+#  Sur iPhone, une application web ne peut RIEN programmer
+#  pendant qu'elle dort : ni Background Sync, ni notification
+#  différée. Il faut donc qu'un tiers envoie le push. Ce tiers,
+#  c'est cette tâche planifiée — gratuite et illimitée sur un
+#  dépôt public.
+#
+#  Secret à créer une seule fois :
+#    Settings → Secrets and variables → Actions → New secret
+#    Nom : VAPID_PRIVATE
+#
+#  ⚠️ GitHub désactive les tâches planifiées des dépôts sans
+#  activité depuis ~60 jours. Un simple commit les réveille,
+#  et « Run workflow » ci-dessous permet de tester à la main.
+# ============================================================
+
+name: Notifications SkyFit
+
+on:
+  schedule:
+    # Toutes les heures, à l'heure pile (heure UTC côté GitHub ;
+    # le script raisonne en heure de Paris grâce à TZ ci-dessous).
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Essai à blanc (rien n envoyé, rien écrit)'
+        type: boolean
+        default: false
+
+# Une seule exécution à la fois : deux réveils qui se chevauchent
+# enverraient l'alerte en double avant d'avoir posé leur verrou.
+concurrency:
+  group: skyfit-notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TZ: Europe/Paris
+      VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Installer web-push
+        run: npm install --no-save --no-audit --no-fund web-push
+
+      - name: Regarder les avions et prévenir les pilotes
+        run: node scripts/notify.js ${{ inputs.dry_run && '--dry-run' || '' }}
