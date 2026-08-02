@@ -27,6 +27,11 @@ const webpush = require('web-push');
 const ROOT = path.join(__dirname, '..');
 const now = Date.now();
 const DRY = process.argv.includes('--dry-run');
+// --test : envoie une notification à tous les appareils abonnés, sans
+// tenir compte des conditions ni des verrous. Sert à répondre à la seule
+// question qui compte quand rien n'arrive : « le téléphone est-il
+// vraiment abonné ? »
+const TEST = process.argv.includes('--test');
 
 /* ------------------------------------------------------------
    1. Charger les VRAIES règles du jeu
@@ -182,6 +187,8 @@ const LOW_RATIO   = 0.25;   // sous 25 % du plafond, on prévient
 const LOW_HOURS   = 10;     // pas plus d'une alerte altitude par 10 h
 const RIVAL_MAX_H = 3;      // une séance plus vieille que ça n'est plus une nouvelle
 const WHEEL_HOUR  = 19;     // heure locale du rappel de roue
+const CREA_HOUR   = 20;     // rappel créatine à 20 h 30 (heure de Paris)
+const CREA_MIN    = 30;
 
 function decide(CONFIG, name, players, state) {
   const p = players[name];
@@ -191,6 +198,33 @@ function decide(CONFIG, name, players, state) {
   const st = state[name] || {};
   const ceiling = CONFIG.ceilingFor(p);
   const alt = altitudeNow(CONFIG, p);
+
+  // TZ=Europe/Paris est posé par le workflow : ces valeurs sont donc
+  // bien l'heure locale de Diego et Jade, pas l'heure UTC de GitHub.
+  const d = new Date(now);
+  const hour = d.getHours();
+  const minute = d.getMinutes();
+  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+
+  /* --- Créatine du jour ---
+     Placé AVANT le bloc crash, qui sort de la fonction : la créatine
+     se prend même quand l'avion est au sol. Et seuls les pilotes qui en
+     prennent déjà sont concernés — inutile de rappeler à quelqu'un une
+     habitude qui n'est pas la sienne. */
+  const creaLog = (Array.isArray(p.activityLog) ? p.activityLog : [])
+    .filter(e => e && e.activityId === 'creatine');
+  if (creaLog.length) {
+    const priseAujourdhui = creaLog.some(e => (Number(e.date) || 0) >= startOfDay.getTime());
+    const dejaDit = (Number(st.creatineAt) || 0) >= startOfDay.getTime();
+    if (hour === CREA_HOUR && minute >= CREA_MIN && !priseAujourdhui && !dejaDit) {
+      out.push({
+        tag: 'creatine',
+        title: '💊 Attention, tu n\'as pas pris ta créatine du jour',
+        body: 'Une dose de 5 g, et 50 L de kérosène en prime. Tu as jusqu\'à minuit.',
+        set: { creatineAt: now },
+      });
+    }
+  }
 
   /* --- Crash --- */
   if (p.crashed) {
@@ -241,8 +275,6 @@ function decide(CONFIG, name, players, state) {
   }
 
   /* --- Roue du jour --- */
-  const hour = new Date(now).getHours();
-  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
   const wheelDone = Number(p.wheelLast) || 0;
   const alreadyToldToday = (Number(st.wheelAt) || 0) >= startOfDay.getTime();
   if (hour === WHEEL_HOUR && wheelDone < startOfDay.getTime() && !alreadyToldToday) {
@@ -287,10 +319,33 @@ async function main() {
     if (p && p.name) byName[p.name] = p;
   }
 
+  // Diagnostic systématique : quand aucune notification n'arrive, la
+  // première chose à savoir est si un appareil est seulement abonné.
+  const pilotes = Object.keys(byName);
+  const abonnes = pilotes.filter(n => {
+    const s = subs[keyFor(n)];
+    return s && s.endpoint;
+  });
+  console.log(`Pilotes en base   : ${pilotes.join(', ') || '(aucun)'}`);
+  console.log(`Appareils abonnés : ${abonnes.join(', ') || '(aucun)'}`);
+  if (!abonnes.length) {
+    console.log('  → Personne n\'est abonné. Sur iPhone : ouvrir SkyFit depuis');
+    console.log('    l\'icône de l\'écran d\'accueil (pas depuis Safari), fiche');
+    console.log('    pilote, activer les alertes. Un abonnement enregistré');
+    console.log('    pendant que Firebase refusait l\'écriture est perdu :');
+    console.log('    il faut désactiver puis réactiver.');
+  }
+
   let sent = 0;
-  for (const name of Object.keys(byName)) {
+  for (const name of pilotes) {
     const sub = subs[keyFor(name)];
-    const alerts = decide(CONFIG, name, byName, { [name]: state[keyFor(name)] || {} });
+    const alerts = TEST
+      ? [{
+          tag: 'test',
+          title: '🛫 SkyFit vous reçoit cinq sur cinq',
+          body: `Notification d'essai pour ${name}. Si tu lis ceci, tout est branché.`,
+        }]
+      : decide(CONFIG, name, byName, { [name]: state[keyFor(name)] || {} });
 
     let patch = {};
     for (const a of alerts) Object.assign(patch, a.set || {});

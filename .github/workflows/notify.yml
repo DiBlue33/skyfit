@@ -23,10 +23,22 @@ on:
     # Toutes les heures, à l'heure pile (heure UTC côté GitHub ;
     # le script raisonne en heure de Paris grâce à TZ ci-dessous).
     - cron: '0 * * * *'
+    # Le rappel créatine tombe à 20 h 30 de Paris, qui n'est pas une
+    # heure pile. GitHub ne connaît que l'UTC et ignore l'heure d'été :
+    # on déclenche donc les deux candidats, et le script ne retient que
+    # celui qui vaut réellement 20 h 30 à Paris.
+    #   été  (UTC+2) : 18 h 30 UTC = 20 h 30 Paris
+    #   hiver (UTC+1) : 19 h 30 UTC = 20 h 30 Paris
+    - cron: '30 18 * * *'
+    - cron: '30 19 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
         description: 'Essai à blanc (rien n envoyé, rien écrit)'
+        type: boolean
+        default: false
+      test_push:
+        description: 'Notification de test à tous les appareils abonnés'
         type: boolean
         default: false
 
@@ -59,4 +71,7 @@ jobs:
         run: npm install --no-save --no-audit --no-fund web-push
 
       - name: Regarder les avions et prévenir les pilotes
-        run: node scripts/notify.js ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: >
+          node scripts/notify.js
+          ${{ inputs.dry_run && '--dry-run' || '' }}
+          ${{ inputs.test_push && '--test' || '' }}
