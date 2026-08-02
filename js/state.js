@@ -100,6 +100,41 @@ const State = (() => {
     return p;
   }
 
+  /* ---------- Filet de sécurité avant un grand reset ----------
+     Un reset efface des mois de séances. Il a déjà été déclenché à tort une
+     fois (deux appareils de versions différentes qui s'effaçaient l'un
+     l'autre). On garde donc systématiquement une photo du profil AVANT de
+     l'effacer, dans une clé à part : ça ne coûte rien et ça rend l'accident
+     réparable. Récupération depuis la console : State.restaurer('Diego'). */
+  const BACKUP_KEY = 'skyfit_avant_reset';
+
+  function sauvegardes() {
+    try { return JSON.parse(localStorage.getItem(BACKUP_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+
+  function sauvegardeAvantReset(p) {
+    if (!p || !p.name) return;
+    try {
+      const all = sauvegardes();
+      all[p.name] = { at: Date.now(), stamp: p.resetStamp || null, player: JSON.parse(JSON.stringify(p)) };
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(all));
+    } catch (e) { console.warn('Photo avant reset impossible :', e.message); }
+  }
+
+  /** Remet en place le profil tel qu'il était avant son dernier reset. */
+  function restaurer(name) {
+    const snap = sauvegardes()[name];
+    if (!snap || !snap.player) { console.warn('Aucune photo pour', name); return null; }
+    const p = snap.player;
+    p.resetStamp = CONFIG.RESET_STAMP;  // sinon le reset se rejouerait aussitôt
+    p.updatedAt = Date.now();           // fait autorité sur la version du cloud
+    data.players[name] = p;
+    save(null, true);
+    console.info('SkyFit — profil restauré :', name, new Date(snap.at).toLocaleString());
+    return p;
+  }
+
   let data = null; // { players: {name -> player}, currentPlayer: name|null }
 
   function load() {
@@ -130,7 +165,11 @@ const State = (() => {
       // l'opération idempotente et la fait suivre par la synchro : un
       // profil qui revient du cloud sans le bon tampon est remis à
       // zéro à son tour, sur n'importe quel appareil.
-      if (CONFIG.RESET_STAMP && p.resetStamp !== CONFIG.RESET_STAMP) {
+      // Un tampon INCONNU vient d'une version plus récente : on n'y touche
+      // pas (voir CONFIG.needsReset). Sans cette règle, deux téléphones
+      // décalés d'une version se remettaient mutuellement à zéro sans fin.
+      if (CONFIG.needsReset(p)) {
+        sauvegardeAvantReset(p);
         resetPlayer(p);
         console.info('SkyFit — grand reset appliqué à', p.name, CONFIG.RESET_STAMP);
       }
@@ -383,5 +422,6 @@ const State = (() => {
   return {
     load, save, raw, migrate, resetPlayer, addPlayer, selectPlayer, current, allPlayers,
     playerNames, availablePoints, tankCapacity, keroYield, decayFactor, airspeed, ceiling,
+    sauvegardes, restaurer,
   };
 })();

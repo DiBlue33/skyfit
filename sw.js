@@ -16,7 +16,7 @@
    caches. Un test de non-régression vérifie les deux.
    ============================================================ */
 
-const BUILD    = '20260802a';
+const BUILD    = '20260802b';
 const ASSET_V  = '20260728b';
 const CACHE    = 'skyfit-' + BUILD;
 

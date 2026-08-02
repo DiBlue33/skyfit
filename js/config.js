@@ -494,15 +494,25 @@ const CONFIG = {
 
   SAVE_KEY: 'skyfit_save_v1',
 
-  /* Grand reset. Tout profil dont le `resetStamp` ne correspond pas est remis
-     à zéro au chargement, une seule fois — y compris s'il revient du cloud sur
-     un autre appareil. NE PAS changer cette valeur sans vouloir effacer les
-     deux comptes.
+  /* Grands resets, dans l'ORDRE CHRONOLOGIQUE. Le dernier est celui en
+     vigueur ; tout profil resté en arrière est remis à zéro au chargement,
+     une seule fois, y compris s'il revient du cloud.
        v3.6 « 2026-07-28-arbre » : arrivée de l'arbre des compétences.
        v3.7 « 2026-08-02-envol » : fin de la phase de test, le menu admin est
              retiré et les compteurs gonflés pendant le développement sont
-             effacés. C'est le vrai départ. */
-  RESET_STAMP: '2026-08-02-envol',
+             effacés. C'est le vrai départ.
+
+     ⚠️ POURQUOI UNE LISTE ET NON UNE SEULE VALEUR (corrigé le 02/08/2026)
+     La version précédente comparait simplement `p.resetStamp !== RESET_STAMP`.
+     Un appareil resté sur la v3.6 lisait donc « 2026-08-02-envol », ne le
+     reconnaissait pas, remettait le profil à zéro et le publiait ; l'appareil
+     à jour lisait en retour « 2026-07-28-arbre », ne le reconnaissait pas non
+     plus, et remettait à zéro à son tour. Deux téléphones d'une version
+     d'écart s'effaçaient mutuellement, indéfiniment. Avec une liste ordonnée,
+     un tampon INCONNU est traité comme venant du futur et laissé intact :
+     une version ancienne ne peut plus effacer le travail d'une version
+     récente. N'AJOUTER une entrée que pour vouloir réellement tout effacer. */
+  RESET_HISTORY: ['2026-07-28-arbre', '2026-08-02-envol'],
 
   /* Tampon de cache des IMAGES. Le `?v=` posé sur les <script>/<link> dans
      index.html ne protège que le code : les sprites d'avions sont chargés par
@@ -522,6 +532,25 @@ CONFIG.planeById = function (id) {
 };
 
 /** Fiche de l'avion actuellement piloté par ce joueur. */
+/* Tampon du reset en vigueur — dernier élément de l'historique. */
+CONFIG.RESET_STAMP = CONFIG.RESET_HISTORY[CONFIG.RESET_HISTORY.length - 1] || '';
+
+/**
+ * Ce profil doit-il subir un grand reset ?
+ * Oui uniquement s'il porte un tampon STRICTEMENT antérieur au tampon en
+ * vigueur (ou aucun tampon du tout). Un tampon inconnu vient forcément
+ * d'une version plus récente que celle qui tourne ici : on n'y touche pas,
+ * sinon deux appareils décalés d'une version s'effacent mutuellement.
+ */
+CONFIG.needsReset = function (player) {
+  const hist = CONFIG.RESET_HISTORY || [];
+  if (!hist.length) return false;
+  const stamp = player && player.resetStamp;
+  const i = hist.indexOf(stamp);
+  if (stamp && i === -1) return false;   // tampon du futur : intouchable
+  return i < hist.length - 1;            // absent (-1) ou plus ancien
+};
+
 CONFIG.planeOf = function (player) {
   return CONFIG.planeById(player && player.currentPlane);
 };
