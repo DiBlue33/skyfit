@@ -391,6 +391,12 @@ const Profile = (() => {
      6. Personnalisation
      ------------------------------------------------------------ */
 
+  /** L'autre pilote, pour personnaliser le texte des alertes. */
+  function rivalName(p) {
+    const other = State.allPlayers().find(q => q.name !== p.name);
+    return other ? other.name : 'l\'autre pilote';
+  }
+
   function renderCustom(p) {
     const cur = avatarOf(p);
     const choices = AVATAR_CHOICES.map(e =>
@@ -407,6 +413,20 @@ const Profile = (() => {
     ).join('');
 
     return `
+      <h3 class="pf-h3">🔔 Alertes</h3>
+      <div class="pf-notif" id="pf-notif">
+        <p class="pf-notif-why">Trois alertes, pas une de plus : ton avion
+          descend dangereusement, ${escapeHtml(rivalName(p))} vient d'enregistrer
+          une séance, et ton tour de roue du jour t'attend.</p>
+        <div class="pf-notif-state" id="pf-notif-state">Vérification…</div>
+        <div class="pf-inline">
+          <button class="btn small" id="pf-notif-on" type="button" hidden>Activer</button>
+          <button class="btn small ghost" id="pf-notif-off" type="button" hidden>Désactiver</button>
+          <button class="btn small" id="pf-notif-install" type="button" hidden>📲 Comment installer</button>
+        </div>
+        <div class="pf-msg" id="pf-notif-msg"></div>
+      </div>
+
       <h3 class="pf-h3">🎨 Personnalisation</h3>
       <div class="pf-custom-label">Photo de profil</div>
       <div class="pf-avatars pf-photos">${photos}</div>
@@ -522,6 +542,8 @@ const Profile = (() => {
       render();
     });
 
+    if ($('pf-notif')) bindNotif();
+
     const savePin = $('pf-pin-save');
     if (savePin) savePin.addEventListener('click', () => {
       const msg = $('pf-pin-msg');
@@ -537,6 +559,95 @@ const Profile = (() => {
         msg.textContent = '❌ ' + res.error;
       }
     });
+  }
+
+  /* ------------------------------------------------------------
+     Alertes : trois états possibles, un seul bouton visible
+     ------------------------------------------------------------
+     L'état vient de PWA.notifState(), qui est asynchrone (il faut
+     interroger le service worker). Le bloc est donc peint en deux
+     temps : « Vérification… » à l'affichage de la fiche, puis le vrai
+     état dès qu'il est connu. Si la fiche a été refermée entre-temps,
+     on ne touche plus à rien.
+     ------------------------------------------------------------ */
+
+  async function refreshNotif() {
+    const label = $('pf-notif-state');
+    if (!label || typeof PWA === 'undefined') return;
+
+    const st = await PWA.notifState();
+    if (!$('pf-notif-state')) return;   // fiche refermée entre-temps
+
+    const on = $('pf-notif-on');
+    const off = $('pf-notif-off');
+    const inst = $('pf-notif-install');
+    if (on) on.hidden = true;
+    if (off) off.hidden = true;
+    if (inst) inst.hidden = true;
+
+    if (st.needsInstall) {
+      label.className = 'pf-notif-state warn';
+      label.textContent = '📲 ' + st.reason;
+      if (inst) inst.hidden = false;
+      return;
+    }
+    if (!st.supported) {
+      label.className = 'pf-notif-state off';
+      label.textContent = '🚫 ' + st.reason;
+      return;
+    }
+    if (st.permission === 'denied') {
+      label.className = 'pf-notif-state off';
+      label.textContent = '🚫 Notifications bloquées dans les réglages du téléphone.';
+      return;
+    }
+    if (st.subscribed && st.permission === 'granted') {
+      label.className = 'pf-notif-state ok';
+      label.textContent = '✅ Alertes actives sur cet appareil.';
+      if (off) off.hidden = false;
+      return;
+    }
+    label.className = 'pf-notif-state';
+    label.textContent = 'Alertes désactivées sur cet appareil.';
+    if (on) on.hidden = false;
+  }
+
+  function bindNotif() {
+    refreshNotif();
+
+    const msg = () => $('pf-notif-msg');
+    const on = $('pf-notif-on');
+    const off = $('pf-notif-off');
+    const inst = $('pf-notif-install');
+
+    if (on) on.addEventListener('click', async () => {
+      const p = State.current();
+      if (!p) return;
+      on.disabled = true;
+      // Safari exige que requestPermission() parte d'un geste utilisateur :
+      // l'appel est donc DANS le gestionnaire de clic, pas dans un délai.
+      const res = await PWA.enableNotifications(p.name);
+      on.disabled = false;
+      const m = msg();
+      if (m) {
+        m.className = 'pf-msg ' + (res.ok ? 'ok' : 'err');
+        m.textContent = res.ok
+          ? '✅ C\'est armé. Tu seras prévenu si ton avion pique du nez.'
+          : '❌ ' + res.error;
+      }
+      refreshNotif();
+    });
+
+    if (off) off.addEventListener('click', async () => {
+      const p = State.current();
+      if (!p) return;
+      await PWA.disableNotifications(p.name);
+      const m = msg();
+      if (m) { m.className = 'pf-msg'; m.textContent = 'Alertes coupées.'; }
+      refreshNotif();
+    });
+
+    if (inst) inst.addEventListener('click', () => PWA.openGuide());
   }
 
   /**

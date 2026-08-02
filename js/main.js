@@ -13,6 +13,7 @@ const Main = (() => {
     Scene.init();
     UI.bind();
     Sync.startLoop();
+    PWA.init();         // 📲 installable sur l'écran d'accueil + notifications
     startWorldLoop();   // 👥 les autres pilotes volent aussi sur cet appareil
 
     // Toujours passer par l'écran d'accueil (connexion par code PIN)
@@ -53,6 +54,11 @@ const Main = (() => {
     const summary = Engine.catchUp(p);
     State.save();
     Sync.push(p);
+
+    // Cet appareil enverra désormais ses alertes à CE pilote. Sur un
+    // téléphone partagé, se connecter suffit à reprendre la main sur les
+    // notifications : le navigateur n'a qu'un abonnement par appareil.
+    PWA.syncSubscription(p.name);
 
     Scene.setPlane(p.currentPlane);
     UI.refreshHUD();   // peint aussi le ciel via Sky.forPlayer()

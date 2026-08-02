@@ -1,0 +1,41 @@
+{
+  "name": "SkyFit — Fais du sport, garde ton avion en vol !",
+  "short_name": "SkyFit",
+  "description": "Chaque séance de sport remplit le réservoir, l'avion prend de l'altitude et avale des kilomètres. Arrêtez le sport et il redescend.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d3b66",
+  "theme_color": "#0d3b66",
+  "categories": ["fitness", "health", "games", "lifestyle"],
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "assets/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

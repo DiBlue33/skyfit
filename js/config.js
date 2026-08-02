@@ -494,12 +494,15 @@ const CONFIG = {
 
   SAVE_KEY: 'skyfit_save_v1',
 
-  /* Grand reset (v3.6). L'arbre des compétences rebat toutes les cartes :
-     les deux pilotes repartent de zéro, à égalité. Tout profil dont le
-     `resetStamp` ne correspond pas est remis à zéro au chargement, une
-     seule fois — y compris s'il revient du cloud sur un autre appareil.
-     NE PAS changer cette valeur sans vouloir effacer les deux comptes. */
-  RESET_STAMP: '2026-07-28-arbre',
+  /* Grand reset. Tout profil dont le `resetStamp` ne correspond pas est remis
+     à zéro au chargement, une seule fois — y compris s'il revient du cloud sur
+     un autre appareil. NE PAS changer cette valeur sans vouloir effacer les
+     deux comptes.
+       v3.6 « 2026-07-28-arbre » : arrivée de l'arbre des compétences.
+       v3.7 « 2026-08-02-envol » : fin de la phase de test, le menu admin est
+             retiré et les compteurs gonflés pendant le développement sont
+             effacés. C'est le vrai départ. */
+  RESET_STAMP: '2026-08-02-envol',
 
   /* Tampon de cache des IMAGES. Le `?v=` posé sur les <script>/<link> dans
      index.html ne protège que le code : les sprites d'avions sont chargés par

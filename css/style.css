@@ -766,35 +766,6 @@ button {
   display: inline-block;
 }
 
-/* Admin (temporaire) */
-#btn-admin { padding: 10px 12px; }
-
-.admin-section { margin-bottom: 16px; }
-
-.admin-section h4 {
-  font-size: 0.85rem;
-  margin-bottom: 8px;
-  color: var(--text-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.admin-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-
-.admin-row.slider-row input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent); }
-
-#admin-delete-select {
-  flex: 1;
-  min-width: 110px;
-  border: 1px solid var(--panel-border);
-  border-radius: 9px;
-  padding: 7px 8px;
-  font-family: inherit;
-  font-size: 0.85rem;
-  color: var(--text);
-  background: #fff;
-}
-
 .btn {
   border: none;
   border-radius: 12px;
@@ -3303,3 +3274,132 @@ button {
   .skill-row { grid-template-columns: 1fr; }
   .skill-row + .skill-row::before { left: 24px; }
 }
+
+/* ============================================================
+   📲 Application installable & alertes (v3.7)
+   ============================================================ */
+
+/* Invitation à installer, sur l'écran d'accueil. Volontairement
+   discrète et refermable définitivement : elle ne doit pas se
+   rappeler au bon souvenir de quelqu'un qui a dit non. */
+#install-hint {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(46, 134, 222, 0.10), rgba(46, 134, 222, 0.02));
+  text-align: left;
+}
+
+#install-hint[hidden] { display: none; }
+
+#install-hint .ih-text { flex: 1; min-width: 0; }
+
+#install-hint .ih-text b {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 2px;
+}
+
+#install-hint .ih-text span {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-soft);
+}
+
+#install-hint-btn { flex: 0 0 auto; }
+
+#install-hint-close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 4px;
+  color: var(--text-soft);
+  opacity: 0.7;
+}
+
+#install-hint-close:hover { opacity: 1; }
+
+/* Mode d'emploi */
+.install-intro {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  margin-bottom: 14px;
+}
+
+.install-steps[hidden] { display: none; }
+
+.install-os {
+  font-weight: 700;
+  font-size: 0.92rem;
+  margin-bottom: 8px;
+}
+
+.install-steps ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.install-steps li {
+  font-size: 0.88rem;
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.install-steps .ikey {
+  display: inline-block;
+  padding: 0 5px;
+  border: 1px solid var(--panel-border);
+  border-radius: 5px;
+  background: #fff;
+  font-size: 0.85em;
+}
+
+.install-note {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  background: rgba(46, 134, 222, 0.06);
+  border-radius: 0 8px 8px 0;
+}
+
+/* Bloc « Alertes » de la fiche de pilote */
+.pf-notif {
+  padding: 12px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  margin-bottom: 18px;
+}
+
+.pf-notif-why {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-soft);
+  margin-bottom: 10px;
+}
+
+.pf-notif-state {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.pf-notif-state.ok { color: var(--ok); }
+.pf-notif-state.warn { color: var(--accent-warm); }
+.pf-notif-state.off { color: var(--text-soft); }
+
+.pf-notif .pf-inline button[hidden] { display: none; }

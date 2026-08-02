@@ -347,7 +347,7 @@ const State = (() => {
     return Object.keys(data.players);
   }
 
-  // Points disponibles (gagnés + bonus admin - dépensés)
+  // Points disponibles (gagnés + bonus de quêtes/succès - dépensés)
   function availablePoints(p) {
     return Math.floor(p.points + (p.bonusPoints || 0) - p.pointsSpent);
   }

@@ -250,6 +250,40 @@ const Sync = (() => {
     });
   }
 
+  /* ---------- Abonnements aux notifications ----------
+     Rangés sous /push/<pilote>, à part des profils : ce sont des
+     données d'appareil, pas de jeu, et surtout un profil entier est
+     réécrit en bloc à chaque `push()` — un abonnement logé dedans
+     serait écrasé par le premier appareil à publier une version
+     légèrement plus ancienne. Un pilote = un abonnement, le dernier
+     appareil connecté gagne. */
+
+  async function savePush(name, sub) {
+    if (!enabled() || !name || !sub) return false;
+    try {
+      const res = await fetch(`${baseUrl()}/push/${keyFor(name)}.json`, {
+        method: 'PUT', body: JSON.stringify(sub),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return true;
+    } catch (e) {
+      console.warn('Abonnement non enregistré :', e.message);
+      return false;
+    }
+  }
+
+  async function deletePush(name) {
+    if (!enabled() || !name) return false;
+    try {
+      const res = await fetch(`${baseUrl()}/push/${keyFor(name)}.json`,
+        { method: 'DELETE' });
+      return res.ok;
+    } catch (e) {
+      console.warn('Désabonnement non transmis :', e.message);
+      return false;
+    }
+  }
+
   /* ---------- Indicateur d'état ---------- */
 
   function statusText() {
@@ -266,6 +300,7 @@ const Sync = (() => {
 
   return {
     enabled, pullAll, push, mergeIntoLocal, fullSync, deletePlayer,
+    savePush, deletePush,
     startLoop, statusText, updateBadge,
   };
 })();
