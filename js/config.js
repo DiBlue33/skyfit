@@ -500,7 +500,11 @@ const CONFIG = {
        v3.6 « 2026-07-28-arbre » : arrivée de l'arbre des compétences.
        v3.7 « 2026-08-02-envol » : fin de la phase de test, le menu admin est
              retiré et les compteurs gonflés pendant le développement sont
-             effacés. C'est le vrai départ.
+             effacés. C'était censé être le vrai départ.
+       v3.7.1 « 2026-08-02-page-blanche » : les remises à zéro en boucle
+             (voir ci-dessous) ont laissé les deux profils dans un état
+             incertain. Demandé par Diego : on repart proprement, à égalité,
+             une fois le défaut corrigé. Celui-ci est le vrai départ.
 
      ⚠️ POURQUOI UNE LISTE ET NON UNE SEULE VALEUR (corrigé le 02/08/2026)
      La version précédente comparait simplement `p.resetStamp !== RESET_STAMP`.
@@ -512,7 +516,11 @@ const CONFIG = {
      un tampon INCONNU est traité comme venant du futur et laissé intact :
      une version ancienne ne peut plus effacer le travail d'une version
      récente. N'AJOUTER une entrée que pour vouloir réellement tout effacer. */
-  RESET_HISTORY: ['2026-07-28-arbre', '2026-08-02-envol'],
+  RESET_HISTORY: [
+    '2026-07-28-arbre',
+    '2026-08-02-envol',
+    '2026-08-02-page-blanche',
+  ],
 
   /* Tampon de cache des IMAGES. Le `?v=` posé sur les <script>/<link> dans
      index.html ne protège que le code : les sprites d'avions sont chargés par
