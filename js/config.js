@@ -647,3 +647,126 @@ CONFIG.gradeOf = function (player) {
 CONFIG.nextGrade = function (player) {
   return CONFIG.GRADES[CONFIG.gradeIndex(player) + 1] || null;
 };
+
+/* ============================================================
+   Bilan de la semaine 📈 (v3.8)
+   ------------------------------------------------------------
+   Ces fonctions vivent ici, et pas dans un module du jeu, pour une
+   raison précise : l'émetteur de notifications (scripts/notify.js)
+   n'a ni DOM ni State, mais il exécute déjà config.js tel quel. En
+   les plaçant là, le récapitulatif annoncé le dimanche soir par
+   notification et celui affiché dans le jeu sont calculés par le
+   MÊME code. Deux recopies auraient fini par diverger, et rien
+   n'use davantage la confiance qu'un bilan qui ne dit pas la même
+   chose selon l'endroit où on le lit.
+
+   La semaine va du LUNDI 00 h 00 au dimanche 23 h 59, en heure
+   locale. C'est déjà la semaine des quêtes : garder deux découpages
+   différents dans le même jeu serait incompréhensible.
+   ============================================================ */
+
+/** Lundi 00 h 00 de la semaine contenant `ts`. */
+CONFIG.weekStart = function (ts) {
+  const d = new Date(typeof ts === 'number' ? ts : Date.now());
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));   // 0 = lundi … 6 = dimanche
+  return d.getTime();
+};
+
+/** Lundi suivant (borne de fin, exclue). Passe par weekStart pour que
+    les changements d'heure ne décalent pas la borne d'une heure. */
+CONFIG.weekEnd = function (ws) {
+  return CONFIG.weekStart(ws + 8 * 86400000);
+};
+
+/** Semaine décalée de `n` semaines (négatif = vers le passé).
+    Les 12 h ajoutées absorbent les changements d'heure : sans elles,
+    reculer d'une semaine fin octobre atterrit le dimanche 23 h et
+    renvoie la semaine d'avant. */
+CONFIG.weekShift = function (ws, n) {
+  return CONFIG.weekStart(ws + n * 7 * 86400000 + 43200000);
+};
+
+/**
+ * Récapitulatif d'une semaine pour un pilote.
+ *
+ * Deux sources, et c'est volontaire :
+ *   · tout ce qui est DATÉ (séances, minutes, kérosène) se relit dans le
+ *     journal — exact, y compris pour une semaine passée ;
+ *   · tout ce qui est CUMULÉ (km, points, temps de vol) n'existe qu'en
+ *     total courant. On le retrouve par différence avec l'instantané du
+ *     lundi pour la semaine en cours, et dans l'archive `weekLog` pour
+ *     les semaines terminées. Une semaine antérieure à la mise en place
+ *     du mécanisme rend donc `km: null` — affiché « — » plutôt qu'un
+ *     zéro qui ferait croire à une semaine sans vol.
+ */
+CONFIG.weekReport = function (player, ts) {
+  const p = player || {};
+  const ws = CONFIG.weekStart(typeof ts === 'number' ? ts : Date.now());
+  const we = CONFIG.weekEnd(ws);
+  const meta = CONFIG.META_ENTRIES || {};
+
+  const log = (Array.isArray(p.activityLog) ? p.activityLog : [])
+    .filter(e => e && Number(e.date) >= ws && Number(e.date) < we);
+  const sport = log.filter(e => !meta[e.activityId] && e.activityId !== 'creatine');
+
+  const bySport = {};
+  const jours = {};
+  let best = null;
+  sport.forEach(e => {
+    const min = Number(e.minutes) || 0;
+    const s = bySport[e.activityId] || (bySport[e.activityId] = { id: e.activityId, minutes: 0, count: 0 });
+    s.minutes += min; s.count++;
+    jours[new Date(Number(e.date)).getDay()] = true;
+    if (!best || min > (Number(best.minutes) || 0)) best = e;
+  });
+
+  /* Points GAGNÉS et non points en poche : dépenser à la boutique ne doit
+     pas faire reculer le bilan de la semaine. */
+  const gagnes = (x) => (Number(x.points) || 0) + (Number(x.pointsSpent) || 0);
+  const ecart = (cur, snap) => Math.max(0, (Number(cur) || 0) - (Number(snap) || 0));
+
+  let cum = null;
+  const arch = (Array.isArray(p.weekLog) ? p.weekLog : [])
+    .find(w => w && Number(w.key) === ws);
+  if (arch) {
+    cum = { km: Number(arch.km) || 0, points: Number(arch.points) || 0,
+            flightMin: Number(arch.flightMin) || 0, landings: Number(arch.landings) || 0 };
+  } else if (Number(p.weekKey) === ws) {
+    cum = { km: ecart(p.lifetimeKm, p.wsKm),
+            points: ecart(gagnes(p), p.wsPoints),
+            flightMin: ecart(p.flightSeconds, p.wsFlight) / 60,
+            landings: ecart(p.landings, p.wsLandings) };
+  }
+
+  return {
+    key: ws,
+    name: p.name || '',
+    sessions: sport.length,
+    minutes: sport.reduce((a, e) => a + (Number(e.minutes) || 0), 0),
+    days: Object.keys(jours).length,
+    sports: Object.values(bySport).sort((a, b) => b.minutes - a.minutes),
+    best: best,
+    creatine: log.filter(e => e.activityId === 'creatine').length,
+    kero: log.reduce((a, e) => a + (Number(e.kero) || 0), 0),
+    km: cum ? cum.km : null,
+    points: cum ? cum.points : null,
+    flightMin: cum ? cum.flightMin : null,
+    landings: cum ? cum.landings : null,
+  };
+};
+
+/**
+ * Qui remporte la semaine ? Sur les MINUTES DE SPORT, pas sur les
+ * kilomètres : les km dépendent surtout de l'avion possédé, donc celui
+ * qui est devant le resterait sans plus rien faire. Le seul classement
+ * qui pousse à bouger est celui de l'effort réel.
+ * Renvoie { winner, tie } — `winner` vaut null si personne n'a bougé.
+ */
+CONFIG.weekWinner = function (reports) {
+  const list = (reports || []).filter(r => r && r.minutes > 0);
+  if (!list.length) return { winner: null, tie: false };
+  const top = list.reduce((a, b) => (b.minutes > a.minutes ? b : a));
+  const exaequo = list.filter(r => r.minutes === top.minutes);
+  return { winner: top, tie: exaequo.length > 1 };
+};

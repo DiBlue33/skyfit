@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkyFit — Fais du sport, garde ton avion en vol !</title>
-  <link rel="stylesheet" href="css/style.css?v=20260802c">
+  <link rel="stylesheet" href="css/style.css?v=20260802d">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>✈️</text></svg>">
 
   <!-- Application installable (PWA) -->
-  <link rel="manifest" href="manifest.webmanifest?v=20260802c">
+  <link rel="manifest" href="manifest.webmanifest?v=20260802d">
   <meta name="theme-color" content="#0d3b66">
   <meta name="description" content="Chaque séance de sport remplit le réservoir, l'avion prend de l'altitude et avale des kilomètres.">
   <!-- iOS : ces trois balises sont ce qui transforme le raccourci en
@@ -99,7 +99,11 @@
 
   <!-- HUD : statistiques + ajout d'activité (bas gauche) -->
   <div class="hud" id="hud-activity">
-    <button class="btn ghost" id="btn-stats" type="button">📊 Statistiques &amp; Calendrier</button>
+    <div class="activity-row">
+      <button class="btn ghost" id="btn-stats" type="button">📊 Stats &amp; Calendrier</button>
+      <button class="btn ghost small" id="btn-weekly" type="button"
+              title="Bilan de la semaine">📈<span id="weekly-badge"></span></button>
+    </div>
     <div class="activity-row">
       <button class="btn" id="btn-add-activity" type="button">➕ Ajouter une séance de sport</button>
       <button class="btn ghost small" id="btn-quests" type="button"
@@ -130,6 +134,24 @@
         <div id="cal-grid"></div>
         <div id="cal-detail"></div>
         <div id="cal-legend"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale : bilan de la semaine -->
+  <div class="modal-backdrop" id="modal-weekly">
+    <div class="modal modal-weekly">
+      <div class="modal-header">
+        <h2>📈 Bilan de la semaine</h2>
+        <button class="modal-close" data-close="modal-weekly" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="wk-nav">
+          <button class="btn ghost small" id="wk-prev" type="button">←</button>
+          <span id="wk-title"></span>
+          <button class="btn ghost small" id="wk-next" type="button">→</button>
+        </div>
+        <div id="wk-body"></div>
       </div>
     </div>
   </div>
@@ -423,28 +445,29 @@
   <!-- Toast -->
   <div id="toast"></div>
 
-  <script src="js/config.js?v=20260802c"></script>
-  <script src="js/routes.js?v=20260802c"></script>
-  <script src="js/skills.js?v=20260802c"></script>
-  <script src="js/state.js?v=20260802c"></script>
-  <script src="js/streak.js?v=20260802c"></script>
-  <script src="js/engine.js?v=20260802c"></script>
-  <script src="js/weather.js?v=20260802c"></script>
-  <script src="js/scene.js?v=20260802c"></script>
-  <script src="js/sky.js?v=20260802c"></script>
-  <script src="js/ui.js?v=20260802c"></script>
-  <script src="js/weather-ui.js?v=20260802c"></script>
-  <script src="js/stats.js?v=20260802c"></script>
-  <script src="js/worlddata.js?v=20260802c"></script>
-  <script src="js/map.js?v=20260802c"></script>
-  <script src="js/achievements.js?v=20260802c"></script>
-  <script src="js/wheel.js?v=20260802c"></script>
-  <script src="js/profile.js?v=20260802c"></script>
-  <script src="js/quests.js?v=20260802c"></script>
-  <script src="js/sync-config.js?v=20260802c"></script>
-  <script src="js/sync.js?v=20260802c"></script>
-  <script src="js/auth.js?v=20260802c"></script>
-  <script src="js/pwa.js?v=20260802c"></script>
-  <script src="js/main.js?v=20260802c"></script>
+  <script src="js/config.js?v=20260802d"></script>
+  <script src="js/routes.js?v=20260802d"></script>
+  <script src="js/skills.js?v=20260802d"></script>
+  <script src="js/state.js?v=20260802d"></script>
+  <script src="js/streak.js?v=20260802d"></script>
+  <script src="js/engine.js?v=20260802d"></script>
+  <script src="js/weather.js?v=20260802d"></script>
+  <script src="js/scene.js?v=20260802d"></script>
+  <script src="js/sky.js?v=20260802d"></script>
+  <script src="js/ui.js?v=20260802d"></script>
+  <script src="js/weather-ui.js?v=20260802d"></script>
+  <script src="js/stats.js?v=20260802d"></script>
+  <script src="js/weekly.js?v=20260802d"></script>
+  <script src="js/worlddata.js?v=20260802d"></script>
+  <script src="js/map.js?v=20260802d"></script>
+  <script src="js/achievements.js?v=20260802d"></script>
+  <script src="js/wheel.js?v=20260802d"></script>
+  <script src="js/profile.js?v=20260802d"></script>
+  <script src="js/quests.js?v=20260802d"></script>
+  <script src="js/sync-config.js?v=20260802d"></script>
+  <script src="js/sync.js?v=20260802d"></script>
+  <script src="js/auth.js?v=20260802d"></script>
+  <script src="js/pwa.js?v=20260802d"></script>
+  <script src="js/main.js?v=20260802d"></script>
 </body>
 </html>

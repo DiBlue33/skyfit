@@ -50,6 +50,11 @@ const Main = (() => {
     const p = State.selectPlayer(name);
     if (!p) { Auth.showHome(); return; }
 
+    // 📈 Bascule hebdomadaire AVANT le rattrapage : sinon les kilomètres
+    // parcourus hors ligne, crédités d'un bloc juste après, iraient
+    // gonfler l'archive de la semaine précédente (voir Weekly.sync).
+    const nouveauBilan = Weekly.sync(p);
+
     // Rattrapage du temps passé navigateur fermé
     const summary = Engine.catchUp(p);
     State.save();
@@ -69,6 +74,12 @@ const Main = (() => {
     UI.streakReminder();   // 🔥 rappel si la série est en sursis
     Wheel.reminder();      // 🎡 rappel si le tour du jour est disponible
     Quests.reminder();     // 🎯 rappel si des récompenses attendent
+    Weekly.updateBadge();  // 📈 pastille si le bilan de la semaine est neuf
+
+    // Le lundi, le bilan de la semaine écoulée s'ouvre de lui-même : c'est
+    // un rendez-vous, et un rendez-vous qu'il faut penser à honorer n'en
+    // est pas un. Après le reste des rappels, pour ne pas les recouvrir.
+    if (nouveauBilan) setTimeout(() => Weekly.open(), 900);
 
     startLoop();
   }
@@ -81,6 +92,9 @@ const Main = (() => {
       const res = Engine.simulate(p, (Date.now() - p.lastTick) / 1000);
       UI.refreshHUD();
       Quests.refresh();   // 🎯 plafond de la semaine, bascule du lundi, pastille
+      // 📈 Une partie laissée ouverte peut franchir minuit du dimanche :
+      // sans ce passage, la semaine ne se refermerait jamais.
+      if (Weekly.sync(p)) { Weekly.updateBadge(); Weekly.open(); }
       if (res && res.route) UI.flightEvents(res.route);   // 🛬 arrivées & changements de cap
     }, CONFIG.TICK_MS);
 

@@ -332,5 +332,9 @@ const Stats = (() => {
 
   document.addEventListener('DOMContentLoaded', bind);
 
-  return { open };
+  // `colorOf` et `animate` sont partagés avec le bilan hebdomadaire
+  // (js/weekly.js) : la convention Jade = rose / Diego = bleu doit rester
+  // définie à UN seul endroit, sinon les deux écrans finiront par se
+  // contredire sur la couleur d'un pilote.
+  return { open, colorOf: playerColor, animate: animateCounters };
 })();

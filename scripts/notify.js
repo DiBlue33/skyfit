@@ -219,6 +219,17 @@ const RIVAL_MAX_H = 3;
 const WHEEL_HOUR  = 19;     // heure locale du rappel de roue
 const CREA_HOUR   = 20;     // rappel créatine à 20 h 30 (heure de Paris)
 const CREA_MIN    = 30;
+const WEEK_HOUR   = 20;     // bilan du dimanche soir (heure de Paris)
+
+/** « 3 h 20 » plutôt que « 200 min » — même format que le panneau du jeu. */
+function dureeTxt(min) {
+  const m = Math.round(Number(min) || 0);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? `${h} h ${String(r).padStart(2, '0')}` : `${h} h`;
+}
+
+const pluriel = (n) => (n > 1 ? 's' : '');
 
 function decide(CONFIG, name, players, state) {
   const p = players[name];
@@ -254,6 +265,52 @@ function decide(CONFIG, name, players, state) {
         set: { creatineAt: now },
       });
     }
+  }
+
+  /* --- Bilan du dimanche soir 📈 ---
+     Avant le bloc crash, comme la créatine : une semaine se raconte même
+     à qui est au sol. Les chiffres sortent de CONFIG.weekReport, le même
+     code que le panneau du jeu — un récapitulatif qui contredirait
+     l'écran serait pire que pas de récapitulatif du tout.
+
+     `hour >= WEEK_HOUR` et non `=== ` : le réveil de GitHub Actions dérive
+     de plusieurs minutes et saute parfois une heure entière. Le verrou
+     `weekAt`, comparé au lundi de la semaine en cours, garantit de toute
+     façon un envoi et un seul par semaine.
+
+     20 h et non minuit : il reste alors une soirée pour renverser une
+     semaine serrée, ce qui est tout l'intérêt de l'annoncer. */
+  const ws = CONFIG.weekStart(now);
+  if (d.getDay() === 0 && hour >= WEEK_HOUR && (Number(st.weekAt) || 0) < ws) {
+    const bilans = Object.keys(players)
+      .map(n => CONFIG.weekReport(players[n], now))
+      .sort((a, b) => b.minutes - a.minutes);
+    const moi = bilans.find(b => b.name === name) ||
+                { name, minutes: 0, sessions: 0, days: 0 };
+    const { winner, tie } = CONFIG.weekWinner(bilans);
+
+    const tableau = bilans.map(b => `${b.name} ${dureeTxt(b.minutes)}`).join(' · ');
+    let verdict;
+    if (bilans.length < 2) {
+      verdict = moi.sessions
+        ? `${moi.sessions} séance${pluriel(moi.sessions)} sur ${moi.days} jour${pluriel(moi.days)}.`
+        : 'Aucune séance cette semaine. La soirée est encore là 😉';
+    } else if (!winner) {
+      verdict = 'Semaine blanche des deux côtés — il reste la soirée 😉';
+    } else if (tie) {
+      verdict = 'Égalité parfaite : la soirée départagera 🤝';
+    } else if (winner.name === name) {
+      verdict = 'Tu remportes la semaine 👑';
+    } else {
+      verdict = `${winner.name} remporte la semaine 👑`;
+    }
+
+    out.push({
+      tag: 'weekly',
+      title: '📈 Bilan de la semaine',
+      body: bilans.length < 2 ? verdict : `${tableau}. ${verdict}`,
+      set: { weekAt: ws },
+    });
   }
 
   /* --- Crash --- */

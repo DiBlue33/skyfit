@@ -524,7 +524,9 @@ button {
   gap: 8px;
 }
 
-#btn-stats { width: 100%; }
+/* Depuis la v3.8, le bouton des stats partage sa ligne avec 📈 : il prend
+   la place restante au lieu des 100 % qu'il occupait seul. */
+#btn-stats { flex: 1; min-width: 0; }
 
 .activity-row { display: flex; gap: 8px; align-items: center; }
 .activity-row #btn-add-activity { flex: 1; }
@@ -3403,3 +3405,232 @@ button {
 .pf-notif-state.off { color: var(--text-soft); }
 
 .pf-notif .pf-inline button[hidden] { display: none; }
+
+/* ============================================================
+   Bilan de la semaine 📈 (v3.8)
+   ============================================================ */
+
+/* Bouton du HUD, même gabarit que 🎯 et 🎡 */
+#btn-weekly { position: relative; font-size: 1.05rem; line-height: 1; }
+
+/* La pastille n'existe que si le module y a écrit un « • » : `:empty`
+   évite d'avoir à poser et retirer une classe depuis le JS. */
+#weekly-badge {
+  position: absolute;
+  top: -6px; right: -6px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent-warm);
+  border: 2px solid #14293c;
+  font-size: 0;
+  box-shadow: 0 2px 6px rgba(200, 110, 20, 0.5);
+}
+#weekly-badge:empty { display: none; }
+
+.modal-weekly { width: min(700px, calc(100vw - 16px)); }
+
+/* ---------- Navigation entre les semaines ---------- */
+
+.wk-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+#wk-title {
+  font-weight: 800;
+  font-size: 0.98rem;
+  text-align: center;
+  flex: 1;
+}
+
+.wk-nav .btn[disabled] { opacity: 0.35; cursor: default; }
+
+/* ---------- Verdict ---------- */
+
+.wk-verdict {
+  border: 1px solid var(--panel-border);
+  border-left: 4px solid var(--pc, var(--accent));
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  background: linear-gradient(100deg, rgba(46, 134, 222, 0.07), rgba(46, 134, 222, 0));
+  animation: card-in 0.4s ease backwards;
+}
+
+.wk-verdict b { font-weight: 800; color: var(--pc, var(--accent)); }
+.wk-verdict.tie { border-left-color: var(--accent-warm); }
+.wk-verdict.none {
+  border-left-color: var(--panel-border);
+  color: var(--text-soft);
+  background: none;
+}
+
+/* ---------- Cartes des deux pilotes ---------- */
+
+.wk-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.wk-card {
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(165deg,
+              color-mix(in srgb, var(--pc) 9%, transparent), transparent);
+  animation: card-in 0.45s ease backwards;
+  min-width: 0;
+}
+
+.wk-card:nth-child(2) { animation-delay: 0.08s; }
+
+/* Le vainqueur se distingue par un liseré à sa couleur, pas par une
+   taille différente : les deux cartes doivent rester comparables. */
+.wk-card.win {
+  border-color: var(--pc);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pc) 22%, transparent);
+}
+
+.wk-head { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+
+.wk-name {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--pc, var(--text));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wk-crown { font-size: 0.95rem; }
+
+.wk-hours {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--pc, var(--text));
+}
+
+.wk-sub { font-size: 0.78rem; color: var(--text-soft); margin-bottom: 8px; }
+
+/* Part des minutes du duo : la barre se lit d'un coup d'œil. */
+.wk-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(30, 50, 70, 0.1);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.wk-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+.wk-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 10px;
+  margin-bottom: 10px;
+}
+
+.wk-stat { min-width: 0; }
+
+.wk-sl {
+  display: block;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+
+.wk-sv2 {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.wk-best {
+  font-size: 0.76rem;
+  color: var(--text-soft);
+  line-height: 1.4;
+  border-top: 1px dashed var(--panel-border);
+  padding-top: 8px;
+  margin-bottom: 8px;
+}
+
+/* ---------- Répartition par sport ---------- */
+
+.wk-sport {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+  font-size: 0.8rem;
+}
+
+.wk-si { width: 20px; text-align: center; font-size: 1rem; flex: none; }
+.wk-si img { width: 18px; height: 18px; object-fit: contain; vertical-align: middle; }
+
+.wk-sn {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wk-sbar {
+  width: 46px;
+  flex: none;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(30, 50, 70, 0.1);
+  overflow: hidden;
+}
+.wk-sbar > i { display: block; height: 100%; border-radius: 3px; }
+
+.wk-sv {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-soft);
+  min-width: 44px;
+  text-align: right;
+}
+
+.wk-none {
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  text-align: center;
+  padding: 6px 0;
+}
+
+.wk-foot {
+  margin-top: 12px;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--text-soft);
+  text-align: center;
+}
+
+/* Sur téléphone, les deux cartes passent l'une sous l'autre : côte à côte,
+   les chiffres deviennent illisibles avant même d'être comparables. */
+@media (max-width: 720px) {
+  .wk-cards { grid-template-columns: 1fr; }
+  .wk-card:nth-child(2) { animation-delay: 0.05s; }
+  .wk-hours { font-size: 1.4rem; }
+  #wk-title { font-size: 0.88rem; }
+  .wk-verdict { font-size: 0.85rem; padding: 9px 12px; }
+  .wk-sbar { width: 38px; }
+}

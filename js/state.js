@@ -58,6 +58,17 @@ const State = (() => {
       qsSpent: 0,                  //                       points dépensés
       qsRoutes: 0,                 //                       lignes possédées
       qsUpg: 0,                    //                       niveaux d'améliorations
+      // Bilan hebdomadaire 📈 (v3.8) — instantané du lundi + archives.
+      // Les km, points et heures de vol n'existent qu'en total courant :
+      // sans photo prise le lundi, impossible de dire ce qu'une semaine
+      // a réellement rapporté. Voir js/weekly.js.
+      weekKey: 0,                  // lundi 00 h 00 de la semaine en cours
+      wsKm: 0,                     // km à vie ce lundi-là
+      wsPoints: 0,                 // points GAGNÉS (poche + dépensés) ce lundi-là
+      wsFlight: 0,                 // secondes de vol ce lundi-là
+      wsLandings: 0,               // arrivées à destination ce lundi-là
+      weekLog: [],                 // semaines terminées, la plus récente en tête
+      weekSeen: 0,                 // dernier bilan consulté (pastille de nouveauté)
       // Arbre des compétences 🎓 (v3.6) — monnaie séparée des points
       gears: 0,                    // roues dentées gagnées (exploration)
       gearsSpent: 0,               // roues dentées investies dans l'arbre
@@ -242,6 +253,18 @@ const State = (() => {
       ['qsKm', 'qsLandings', 'qsBase', 'qsSpent', 'qsRoutes', 'qsUpg'].forEach(k => {
         if (typeof p[k] !== 'number' || !isFinite(p[k])) p[k] = 0;
       });
+      // Bilan hebdomadaire (v3.8) — Firebase supprime les listes vides,
+      // donc weekLog est recréée systématiquement avant toute lecture.
+      ['weekKey', 'wsKm', 'wsPoints', 'wsFlight', 'wsLandings', 'weekSeen'].forEach(k => {
+        if (typeof p[k] !== 'number' || !isFinite(p[k]) || p[k] < 0) p[k] = 0;
+      });
+      if (!Array.isArray(p.weekLog)) {
+        p.weekLog = p.weekLog ? Object.values(p.weekLog) : [];
+      }
+      p.weekLog = p.weekLog
+        .filter(w => w && typeof w === 'object' && Number(w.key) > 0)
+        .sort((a, b) => Number(b.key) - Number(a.key))
+        .slice(0, 26);   // six mois d'archives : au-delà, plus personne ne regarde
       // Fiche de pilote (v2.8) — champs plats + liste que Firebase peut vider
       if (typeof p.avatar !== 'string') p.avatar = '';
       if (typeof p.callsign !== 'string') p.callsign = '';

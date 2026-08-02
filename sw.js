@@ -16,13 +16,13 @@
    caches. Un test de non-régression vérifie les deux.
    ============================================================ */
 
-const BUILD    = '20260802c';
+const BUILD    = '20260802d';
 const ASSET_V  = '20260728b';
 const CACHE    = 'skyfit-' + BUILD;
 
 const JS = [
   'config', 'routes', 'skills', 'state', 'engine', 'scene', 'sky', 'ui',
-  'stats', 'streak', 'weather', 'weather-ui', 'map', 'worlddata',
+  'stats', 'weekly', 'streak', 'weather', 'weather-ui', 'map', 'worlddata',
   'achievements', 'wheel', 'profile', 'quests', 'sync-config', 'sync',
   'auth', 'pwa', 'main',
 ];
