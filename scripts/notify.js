@@ -152,13 +152,25 @@ function hoursToGround(CONFIG, p, alt) {
   return perHour > 0 ? alt / perHour : Infinity;
 }
 
-/** Dernière VRAIE séance de sport (les entrées méta n'en sont pas). */
+/* Une entrée du journal porte DEUX horodatages, et les confondre casse
+   l'alerte « le conjoint s'est entraîné » :
+     · date     = début de la séance, choisi par le joueur. Peut être
+                  ce matin, ou hier, pour une séance saisie après coup.
+     · loggedAt = instant réel de la saisie. C'est CELUI-LÀ qui dit
+                  « il vient de se passer quelque chose ».
+   Tout ce qui relève de la nouveauté (fraîcheur, anti-doublon) se
+   calcule donc sur loggedAt ; `date` ne sert plus qu'à raconter quand
+   la séance a eu lieu. Le repli sur `date` couvre les entrées
+   enregistrées avant l'existence du champ loggedAt. */
+const saisieAt = (e) => Number(e && (e.loggedAt || e.date)) || 0;
+
+/** Dernière VRAIE séance de sport SAISIE (les entrées méta n'en sont pas). */
 function lastSession(CONFIG, p) {
   const log = Array.isArray(p.activityLog) ? p.activityLog : [];
   let best = null;
   for (const e of log) {
     if (!e || CONFIG.META_ENTRIES[e.activityId]) continue;
-    if (!best || (e.date || 0) > (best.date || 0)) best = e;
+    if (!best || saisieAt(e) > saisieAt(best)) best = e;
   }
   return best;
 }
@@ -166,6 +178,22 @@ function lastSession(CONFIG, p) {
 function activityName(CONFIG, id) {
   const a = (CONFIG.ACTIVITIES || []).find(x => x.id === id);
   return a ? a.name : 'une séance';
+}
+
+/**
+ * Précise QUAND la séance a eu lieu, mais seulement si ce n'est pas
+ * « à l'instant » : annoncer une sortie du matin saisie à midi sans
+ * rien dire laisse croire qu'elle vient de se terminer.
+ */
+function quand(debut, saisie) {
+  if (!debut || saisie - debut < 2 * 3600000) return '';
+  const d = new Date(debut);
+  const minuit = new Date(saisie); minuit.setHours(0, 0, 0, 0);
+  const mm = d.getMinutes();
+  const h = `${d.getHours()} h` + (mm ? ` ${String(mm).padStart(2, '0')}` : '');
+  if (debut >= minuit.getTime()) return ` (à ${h})`;
+  if (debut >= minuit.getTime() - 86400000) return ` (hier à ${h})`;
+  return ` (le ${d.getDate()}/${d.getMonth() + 1})`;
 }
 
 function fmtFt(n) {
@@ -185,7 +213,9 @@ function fmtFt(n) {
 
 const LOW_RATIO   = 0.25;   // sous 25 % du plafond, on prévient
 const LOW_HOURS   = 10;     // pas plus d'une alerte altitude par 10 h
-const RIVAL_MAX_H = 3;      // une séance plus vieille que ça n'est plus une nouvelle
+// Une séance SAISIE il y a plus de 3 h n'est plus une nouvelle. Large
+// devant le réveil horaire : même un réveil raté laisse passer l'alerte.
+const RIVAL_MAX_H = 3;
 const WHEEL_HOUR  = 19;     // heure locale du rappel de roue
 const CREA_HOUR   = 20;     // rappel créatine à 20 h 30 (heure de Paris)
 const CREA_MIN    = 30;
@@ -256,11 +286,15 @@ function decide(CONFIG, name, players, state) {
     });
   }
 
-  /* --- Séance du conjoint --- */
+  /* --- Séance du conjoint ---
+     Fraîcheur ET anti-doublon se mesurent à la SAISIE, pas au début de
+     la séance : une course du matin notée à midi reste une nouvelle,
+     et une séance oubliée saisie après une plus récente ne doit pas
+     être avalée par un verrou déjà en avance. */
   const rivalName = Object.keys(players).find(n => n !== name);
   if (rivalName) {
     const s = lastSession(CONFIG, players[rivalName]);
-    const ts = s ? Number(s.date) || 0 : 0;
+    const ts = saisieAt(s);
     if (s && ts > (Number(st.rivalAt) || 0) && now - ts < RIVAL_MAX_H * 3600000) {
       const mins = Number(s.minutes) || 0;
       out.push({
@@ -268,6 +302,7 @@ function decide(CONFIG, name, players, state) {
         title: `🏃 ${rivalName} vient de s'entraîner`,
         body: `${activityName(CONFIG, s.activityId)}` +
               (mins ? ` — ${mins} min` : '') +
+              quand(Number(s.date) || 0, ts) +
               `. À toi de jouer.`,
         set: { rivalAt: ts },
       });
