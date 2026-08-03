@@ -38,7 +38,9 @@ const Sync = (() => {
       const res = await fetch(`${baseUrl()}/players.json`, { cache: 'no-store' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       lastOk = Date.now(); lastError = false;
-      return (await res.json()) || {};
+      const players = (await res.json()) || {};
+      noteCloud(players);
+      return players;
     } catch (e) {
       lastError = true;
       console.warn('Sync pull impossible :', e.message);
@@ -46,8 +48,50 @@ const Sync = (() => {
     }
   }
 
-  async function push(player, keepalive = false) {
+  /* ---------- Garde-fou anti-régression (v3.9) ----------
+     Deuxième verrou après la correction de resetPlayer(). On mémorise la
+     dernière copie connue du cloud pour chaque pilote et on REFUSE de publier
+     un profil qui aurait moins de km à vie qu'elle, à tampon de reset égal.
+     lifetimeKm ne redescend jamais en jeu : une baisse signifie forcément un
+     effacement. Un vrai grand reset, lui, change le tampon — il passe donc.
+     Seule la restauration explicite (State.restaurer / Sync.restaurerDepuisCloud)
+     force le passage. */
+  const cloudSeen = {};
+  let lastBlocked = null;
+
+  function noteCloud(cloudPlayers) {
+    Object.values(cloudPlayers || {}).forEach(cp => {
+      if (!cp || !cp.name) return;
+      cloudSeen[cp.name] = {
+        resetStamp: cp.resetStamp || '',
+        lifetimeKm: Number(cp.lifetimeKm) || 0,
+        updatedAt: Number(cp.updatedAt) || 0,
+      };
+    });
+  }
+
+  function regression(p) {
+    const cp = cloudSeen[p.name];
+    if (!cp) return null;
+    if ((p.resetStamp || '') !== cp.resetStamp) return null; // vrai reset : autorisé
+    const local = Number(p.lifetimeKm) || 0;
+    if (local >= cp.lifetimeKm - 1e-6) return null;
+    return { local, cloud: cp.lifetimeKm };
+  }
+
+  async function push(player, keepalive = false, force = false) {
     if (!enabled() || !player) return false;
+    if (!force) {
+      const reg = regression(player);
+      if (reg) {
+        lastBlocked = { name: player.name, at: Date.now(), ...reg };
+        console.warn(
+          `SkyFit — envoi BLOQUÉ pour ${player.name} : ce profil local a ` +
+          `${reg.local.toFixed(1)} km alors que le cloud en a ${reg.cloud.toFixed(1)} ` +
+          `avec le même tampon de reset. Les données du cloud sont conservées.`);
+        return false;
+      }
+    }
     try {
       const res = await fetch(`${baseUrl()}/players/${keyFor(player.name)}.json`, {
         method: 'PUT',
@@ -56,12 +100,127 @@ const Sync = (() => {
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       lastOk = Date.now(); lastError = false;
+      noteCloud({ [player.name]: player }); // le cloud vaut maintenant ceci
       return true;
     } catch (e) {
       lastError = true;
       console.warn('Sync push impossible :', e.message);
       return false;
     }
+  }
+
+  /* ---------- Sauvegardes de secours dans le cloud (v3.9) ----------
+     Le filet local (skyfit_avant_reset) ne vit que dans le navigateur qui a
+     fait le dégât : inutile depuis un autre appareil, c'est-à-dire le jour où
+     on en a besoin. On garde donc aussi les photos dans /backups/<nom>/<ts>. */
+
+  const BACKUP_DAY_KEY = 'skyfit_backup_cloud';
+  const KEEP_BACKUPS = 12;
+  let lastBackupKey = 0;
+
+  async function backup(player, tag) {
+    if (!enabled() || !player || !player.name) return false;
+    // Deux photos prises dans la même milliseconde (photo d'avant-reset +
+    // photo du jour, à la même synchro) partageraient la même clé et la
+    // seconde effacerait la première.
+    const ts = Math.max(Date.now(), lastBackupKey + 1);
+    lastBackupKey = ts;
+    try {
+      const res = await fetch(`${baseUrl()}/backups/${keyFor(player.name)}/${ts}.json`, {
+        method: 'PUT',
+        body: JSON.stringify({ at: ts, tag: tag || 'auto', player }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      await prunerSauvegardes(player.name);
+      return true;
+    } catch (e) {
+      console.warn('Sauvegarde cloud impossible :', e.message);
+      return false;
+    }
+  }
+
+  /** Ne conserve que les KEEP_BACKUPS photos les plus récentes. */
+  async function prunerSauvegardes(name) {
+    try {
+      const res = await fetch(
+        `${baseUrl()}/backups/${keyFor(name)}.json?shallow=true`, { cache: 'no-store' });
+      if (!res.ok) return;
+      // Clés = horodatages en ms, toutes de même longueur : le tri texte suffit.
+      const keys = Object.keys((await res.json()) || {}).sort();
+      for (const k of keys.slice(0, Math.max(0, keys.length - KEEP_BACKUPS))) {
+        await fetch(`${baseUrl()}/backups/${keyFor(name)}/${k}.json`, { method: 'DELETE' });
+      }
+    } catch (e) { /* le ménage réessaiera demain */ }
+  }
+
+  /** Recopie dans le cloud les photos prises juste avant un grand reset. */
+  async function envoyerSauvegardes() {
+    if (!enabled() || !State.sauvegardesEnAttente) return;
+    for (const s of State.sauvegardesEnAttente()) {
+      if (await backup(s.player, 'avant-reset')) State.marquerSauvegardeEnvoyee(s.name);
+    }
+  }
+
+  /** Une photo par jour et par pilote : de quoi remonter une douzaine de jours. */
+  async function sauvegardeQuotidienne() {
+    if (!enabled()) return;
+    let vues = {};
+    try { vues = JSON.parse(localStorage.getItem(BACKUP_DAY_KEY)) || {}; } catch (e) { vues = {}; }
+    let touched = false;
+    for (const p of State.allPlayers()) {
+      if (Date.now() - (vues[p.name] || 0) < 86400000) continue;
+      if (await backup(p, 'quotidienne')) { vues[p.name] = Date.now(); touched = true; }
+    }
+    if (touched) {
+      try { localStorage.setItem(BACKUP_DAY_KEY, JSON.stringify(vues)); } catch (e) { /* tant pis */ }
+    }
+  }
+
+  /** Console : Sync.listerSauvegardes('Diego') → photos disponibles. */
+  async function listerSauvegardes(name) {
+    if (!enabled()) { console.warn('Synchro désactivée.'); return []; }
+    try {
+      const res = await fetch(`${baseUrl()}/backups/${keyFor(name)}.json`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const all = (await res.json()) || {};
+      const liste = Object.entries(all).map(([ts, s]) => ({
+        ts: Number(ts),
+        quand: new Date(Number(ts)).toLocaleString('fr-FR'),
+        tag: s && s.tag,
+        km: s && s.player ? Math.round(s.player.lifetimeKm || 0) : 0,
+      })).sort((a, b) => b.ts - a.ts);
+      console.table(liste);
+      return liste;
+    } catch (e) { console.warn('Lecture des sauvegardes impossible :', e.message); return []; }
+  }
+
+  /** Console : Sync.restaurerDepuisCloud('Diego') — ou avec un ts précis. */
+  async function restaurerDepuisCloud(name, ts) {
+    if (!enabled()) { console.warn('Synchro désactivée.'); return null; }
+    try {
+      let snap;
+      if (ts) {
+        const r = await fetch(`${baseUrl()}/backups/${keyFor(name)}/${ts}.json`, { cache: 'no-store' });
+        snap = r.ok ? await r.json() : null;
+      } else {
+        const r = await fetch(`${baseUrl()}/backups/${keyFor(name)}.json`, { cache: 'no-store' });
+        const all = r.ok ? ((await r.json()) || {}) : {};
+        const dernier = Object.keys(all).sort().pop();
+        snap = dernier ? all[dernier] : null;
+      }
+      if (!snap || !snap.player) { console.warn('Aucune sauvegarde pour', name); return null; }
+      const p = snap.player;
+      p.resetStamp = CONFIG.RESET_STAMP; // sinon le reset se rejouerait aussitôt
+      p.updatedAt = Date.now();
+      p.restoredAt = Date.now();         // laissez-passer du garde-fou
+      State.raw().players[name] = p;
+      State.migrate();
+      State.save(null, true);
+      await push(p, false, true); // restauration : on force le garde-fou
+      console.info('SkyFit — restauré depuis le cloud :', name,
+        new Date(snap.at).toLocaleString('fr-FR'));
+      return p;
+    } catch (e) { console.warn('Restauration impossible :', e.message); return null; }
   }
 
   /* ---------- Suppression de pilotes (tombstones) ---------- */
@@ -210,6 +369,8 @@ const Sync = (() => {
     await cleanupCloud(cloud, deleted);
     changed = mergeIntoLocal(cloud, deleted) || changed;
     await pushNewer(cloud, deleted);
+    await envoyerSauvegardes();   // photos prises avant un grand reset
+    await sauvegardeQuotidienne();
     return changed;
   }
 
@@ -302,5 +463,8 @@ const Sync = (() => {
     enabled, pullAll, push, mergeIntoLocal, fullSync, deletePlayer,
     savePush, deletePush,
     startLoop, statusText, updateBadge,
+    // Sauvegardes de secours + garde-fou (v3.9)
+    backup, listerSauvegardes, restaurerDepuisCloud,
+    dernierBlocage: () => lastBlocked,
   };
 })();

@@ -38,9 +38,33 @@
     ".write": false,
 
     // Les profils pilotes : lus et écrits par les deux navigateurs.
+    //
+    // Le ".validate" est le verrou du 03/08/2026. Ce jour-là, un ordinateur
+    // resté fermé plusieurs heures a appliqué un grand reset sur des données
+    // périmées, puis a publié les profils vierges par-dessus les bons. Le
+    // client a été corrigé, mais un navigateur gardant une vieille version en
+    // cache pourrait recommencer : cette règle refuse l'écriture côté serveur,
+    // quel que soit le code qui l'envoie.
+    //
+    // Traduction : on accepte une écriture si le profil n'existe pas encore,
+    // OU si le tampon de reset change (un vrai grand reset a le droit de tout
+    // remettre à zéro), OU s'il s'agit d'une restauration explicite (restoredAt
+    // augmente), OU si les km à vie ne diminuent pas. En jeu, lifetimeKm ne
+    // redescend jamais : une baisse est forcément un effacement accidentel.
     "players": {
       ".read": true,
-      "$pilote": { ".write": true }
+      "$pilote": {
+        ".write": true,
+        ".validate": "!data.exists() || !data.hasChild('lifetimeKm') || !newData.hasChild('lifetimeKm') || newData.child('resetStamp').val() != data.child('resetStamp').val() || (newData.child('restoredAt').isNumber() && (!data.child('restoredAt').isNumber() || newData.child('restoredAt').val() > data.child('restoredAt').val())) || newData.child('lifetimeKm').val() >= data.child('lifetimeKm').val()"
+      }
+    },
+
+    // Sauvegardes de secours : une photo par jour et par pilote, plus une
+    // photo juste avant chaque grand reset. Stockées ici plutôt que dans le
+    // navigateur, pour rester récupérables depuis n'importe quel appareil.
+    // Console : Sync.listerSauvegardes('Diego') / Sync.restaurerDepuisCloud('Diego')
+    "backups": {
+      "$pilote": { ".read": true, ".write": true }
     },
 
     // Pierres tombales des profils supprimés, pour qu'une

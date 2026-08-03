@@ -75,6 +75,10 @@ const State = (() => {
       gearCapstone: 0,             // 1 = bonus « toutes les destinations » encaissé
       skills: ['ppl'],             // qualifications débloquées (PPL offerte)
       resetStamp: CONFIG.RESET_STAMP, // marqueur du dernier grand reset
+      restoredAt: 0,               // date de la dernière restauration explicite
+                                   // (seul cas où les km ont le droit de
+                                   // redescendre — voir le garde-fou de sync.js
+                                   // et le .validate des règles Firebase)
       // Fiche de pilote 🎫 (v2.8)
       avatar: '',                  // emoji choisi ('' = valeur par défaut selon le nom)
       callsign: '',                // indicatif radio libre, ex. « SKY01 »
@@ -104,10 +108,20 @@ const State = (() => {
       avatar: p.avatar || '',
       callsign: p.callsign || '',
       createdAt: p.createdAt || Date.now(),
+      // ⚠️ Incident du 03/08/2026 — NE JAMAIS remplacer par Date.now().
+      // Un appareil resté fermé pendant qu'un reset était déclenché ailleurs
+      // applique ce reset à son réveil, sur des données périmées. S'il
+      // réestampille le profil vierge à « maintenant », ce profil vide devient
+      // le plus récent du parc : la fusion refuse de l'écraser et la synchro le
+      // publie par-dessus les bonnes données des autres appareils (c'est
+      // exactement ce qui a effacé Diégo et Jade le 03/08 à 13 h 16).
+      // En gardant la date d'origine, le profil vierge PERD la fusion : la
+      // copie du cloud, plus fraîche, revient — et migrate() la remettra à
+      // zéro à son tour si elle en a réellement besoin.
+      updatedAt: p.updatedAt || 0,
     };
     Object.keys(p).forEach(k => { delete p[k]; });
     Object.assign(p, newPlayer(keep.name), keep);
-    p.updatedAt = Date.now();
     return p;
   }
 
@@ -128,9 +142,33 @@ const State = (() => {
     if (!p || !p.name) return;
     try {
       const all = sauvegardes();
-      all[p.name] = { at: Date.now(), stamp: p.resetStamp || null, player: JSON.parse(JSON.stringify(p)) };
+      all[p.name] = {
+        at: Date.now(),
+        stamp: p.resetStamp || null,
+        player: JSON.parse(JSON.stringify(p)),
+        // v3.9 : la photo doit aussi partir dans le cloud. Celle d'ici ne vit
+        // que dans le navigateur qui a fait le dégât — inutile depuis un autre
+        // appareil, ce qui est précisément le cas le jour où on en a besoin.
+        cloudPending: true,
+      };
       localStorage.setItem(BACKUP_KEY, JSON.stringify(all));
     } catch (e) { console.warn('Photo avant reset impossible :', e.message); }
+  }
+
+  /** Photos pas encore recopiées dans le cloud (voir Sync.envoyerSauvegardes). */
+  function sauvegardesEnAttente() {
+    return Object.entries(sauvegardes())
+      .filter(([, s]) => s && s.cloudPending && s.player)
+      .map(([name, s]) => ({ name, at: s.at, stamp: s.stamp, player: s.player }));
+  }
+
+  function marquerSauvegardeEnvoyee(name) {
+    try {
+      const all = sauvegardes();
+      if (!all[name]) return;
+      delete all[name].cloudPending;
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(all));
+    } catch (e) { /* sans importance : on réessaiera */ }
   }
 
   /** Remet en place le profil tel qu'il était avant son dernier reset. */
@@ -140,8 +178,14 @@ const State = (() => {
     const p = snap.player;
     p.resetStamp = CONFIG.RESET_STAMP;  // sinon le reset se rejouerait aussitôt
     p.updatedAt = Date.now();           // fait autorité sur la version du cloud
+    p.restoredAt = Date.now();          // laissez-passer du garde-fou
     data.players[name] = p;
     save(null, true);
+    // Une restauration fait volontairement REDESCENDRE les km : c'est le seul
+    // cas légitime, il faut donc forcer la main au garde-fou anti-régression.
+    if (typeof Sync !== 'undefined' && Sync.enabled && Sync.enabled()) {
+      Sync.push(p, false, true);
+    }
     console.info('SkyFit — profil restauré :', name, new Date(snap.at).toLocaleString());
     return p;
   }
@@ -445,6 +489,6 @@ const State = (() => {
   return {
     load, save, raw, migrate, resetPlayer, addPlayer, selectPlayer, current, allPlayers,
     playerNames, availablePoints, tankCapacity, keroYield, decayFactor, airspeed, ceiling,
-    sauvegardes, restaurer,
+    sauvegardes, restaurer, sauvegardesEnAttente, marquerSauvegardeEnvoyee,
   };
 })();
