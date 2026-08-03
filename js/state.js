@@ -75,6 +75,8 @@ const State = (() => {
       gearCapstone: 0,             // 1 = bonus « toutes les destinations » encaissé
       skills: ['ppl'],             // qualifications débloquées (PPL offerte)
       resetStamp: CONFIG.RESET_STAMP, // marqueur du dernier grand reset
+      grants: [],                  // dotations ponctuelles déjà versées (v3.11)
+                                   // — voir CONFIG.GRANTS et appliquerDotations()
       restoredAt: 0,               // date de la dernière restauration explicite
                                    // (seul cas où les km ont le droit de
                                    // redescendre — voir le garde-fou de sync.js
@@ -386,7 +388,53 @@ const State = (() => {
       // du plafond réel de son appareil est ramené à ce plafond, une fois.
       const ceil = CONFIG.ceilingFor(p);
       if (typeof p.altitude === 'number' && p.altitude > ceil) p.altitude = ceil;
+      // Dotations ponctuelles (v3.11) — EN DERNIER, et surtout APRÈS le bloc
+      // de grand reset : un profil remis à zéro repart de newPlayer(), donc
+      // sans ses dotations, et doit les recevoir de nouveau dans la foulée.
+      // Après la normalisation d'activityLog, aussi, puisqu'on y écrit.
+      appliquerDotations(p);
     });
+  }
+
+  /* ------------------------------------------------------------
+     Dotations ponctuelles — voir CONFIG.GRANTS
+     ------------------------------------------------------------
+     Verse à ce pilote toutes les dotations qu'il n'a pas encore reçues, et
+     trace chacune dans le journal des activités : un crédit qui apparaît sans
+     explication ressemble à un bug, et le journal est commun aux deux pilotes.
+     L'entrée est de type « grant », déclaré dans CONFIG.META_ENTRIES : elle
+     n'entretient donc pas la série 🔥 et ne compte pas comme du sport. */
+  function appliquerDotations(p) {
+    const list = Array.isArray(CONFIG.GRANTS) ? CONFIG.GRANTS : [];
+    if (!list.length) return 0;
+    // Firebase remplace volontiers une liste par un objet indexé.
+    if (!Array.isArray(p.grants)) p.grants = p.grants ? Object.values(p.grants) : [];
+    if (!Array.isArray(p.activityLog)) p.activityLog = [];
+    let n = 0;
+    list.forEach(g => {
+      if (!g || !g.id || p.grants.indexOf(g.id) >= 0) return;
+      p.grants.push(g.id);
+      const pts = Number(g.points) || 0;
+      if (pts > 0) p.bonusPoints = (Number(p.bonusPoints) || 0) + pts;
+      const kero = Number(g.kerosene) || 0;
+      if (kero > 0) p.kerosene = Math.min(tankCapacity(p), (Number(p.kerosene) || 0) + kero);
+      const now = Date.now();
+      p.activityLog.push({
+        activityId: 'grant',
+        grantId: g.id,
+        grantLabel: g.label || 'Dotation',
+        grantIcon: g.icon || '🎁',
+        minutes: 0,
+        kero: Math.round(kero),
+        pts: pts,
+        date: now,
+        loggedAt: now,
+      });
+      if (p.activityLog.length > 500) p.activityLog.shift();
+      n++;
+      console.info('SkyFit — dotation versée à', p.name, ':', g.id);
+    });
+    return n;
   }
 
   /* ------------------------------------------------------------
@@ -542,5 +590,8 @@ const State = (() => {
     // Grand reset différé : voir le commentaire au-dessus de suspendreReset.
     suspendreReset, libererReset,
     resetEnAttente: () => resetsEnAttente,
+    // Dotations ponctuelles (v3.11) — exposée pour les tests et le diagnostic
+    // en console ; en jeu, c'est migrate() qui l'appelle.
+    appliquerDotations,
   };
 })();

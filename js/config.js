@@ -108,6 +108,7 @@ const CONFIG = {
     quest:       { icon: '🎯', name: 'Quête accomplie' },
     phenomenon:  { icon: '🌌', name: 'Phénomène observé' },
     training:    { icon: '🎓', name: 'Formation validée' },
+    grant:       { icon: '🎁', name: 'Dotation' },
   },
 
   // --- Roue de la chance 🎡 ---
@@ -520,6 +521,38 @@ const CONFIG = {
     '2026-07-28-arbre',
     '2026-08-02-envol',
     '2026-08-02-page-blanche',
+  ],
+
+  /* ------------------------------------------------------------
+     Dotations ponctuelles (v3.11)
+     ------------------------------------------------------------
+     Un crédit versé UNE SEULE FOIS à chaque pilote. Même philosophie que
+     RESET_HISTORY : l'événement est décrit ici, State.migrate() l'applique,
+     et l'id retenu dans `p.grants` le rend idempotent. Conséquences voulues :
+       — la dotation touche les DEUX pilotes sur TOUS leurs appareils, sans
+         que personne ait à ouvrir une console ;
+       — deux téléphones qui l'appliquent chacun de leur côté avant de se
+         synchroniser ne peuvent pas la verser deux fois : la fusion garde
+         UNE copie du profil, elle n'additionne rien ;
+       — un profil restauré depuis une sauvegarde antérieure la reçoit à
+         nouveau, ce qui est le comportement souhaité (elle lui manquait).
+
+     ⚠️ NE JAMAIS renommer ni réutiliser un id déjà distribué : ce serait un
+     second versement silencieux. Pour redonner, ajouter une entrée NEUVE.
+
+     ⚠️ Le crédit passe par `bonusPoints`, jamais par `points` : `points` est
+     recalculé à chaque tick depuis les kilomètres à vie (engine.js:134), donc
+     tout ajout direct serait effacé à la seconde suivante. `bonusPoints` est
+     la poche des gains hors-vol (quêtes, roue, phénomènes) — et il n'entre pas
+     dans le bilan hebdomadaire, qui compte les points GAGNÉS en vol : la
+     dotation ne fausse donc pas le duel de la semaine. */
+  GRANTS: [
+    {
+      id: '2026-08-03-dedommagement',
+      points: 300,
+      label: 'Dédommagement des remises à zéro',
+      icon: '🎁',
+    },
   ],
 
   /* Tampon de cache des IMAGES. Le `?v=` posé sur les <script>/<link> dans

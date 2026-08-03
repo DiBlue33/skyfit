@@ -533,7 +533,8 @@ const UI = (() => {
       const isQuest = e.activityId === 'quest';
       const isPhen = e.activityId === 'phenomenon';
       const isTrain = e.activityId === 'training';
-      const isMeta = isAch || isDisco || isWheel || isQuest || isPhen || isTrain;
+      const isGrant = e.activityId === 'grant';
+      const isMeta = isAch || isDisco || isWheel || isQuest || isPhen || isTrain || isGrant;
       const act = isAch
         ? { icon: e.achIcon || '🏆', name: `Succès « ${e.achName || '?'} »` }
         : isDisco
@@ -546,6 +547,8 @@ const UI = (() => {
         ? { icon: e.cityIcon || '🌌', name: `Phénomène observé : ${e.phenomenonName || '?'}` }
         : isTrain
         ? { icon: '🎓', name: `Formation : ${e.label || '?'}` }
+        : isGrant
+        ? { icon: e.grantIcon || '🎁', name: `${e.grantLabel || 'Dotation'}` }
         : CONFIG.ACTIVITIES.find(a => a.id === e.activityId) ||
           (CONFIG.LEGACY_ACTIVITIES || {})[e.activityId] ||
           { icon: '💪', name: e.activityId };
