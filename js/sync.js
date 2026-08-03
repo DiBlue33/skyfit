@@ -79,6 +79,20 @@ const Sync = (() => {
     return { local, cloud: cp.lifetimeKm };
   }
 
+  /**
+   * La même règle, dans l'autre sens : faut-il refuser d'ADOPTER un profil
+   * venu du cloud ? Sans ça, un appareil sain qui se reconnecte après un
+   * accident avale les profils vierges (plus récents) avant d'avoir pu
+   * republier les siens — et la dernière copie intacte disparaît.
+   * Une restauration explicite (restoredAt qui augmente) reste prioritaire.
+   */
+  function regressionEntrante(cp, lp) {
+    if (!lp || !cp) return false;
+    if ((cp.resetStamp || '') !== (lp.resetStamp || '')) return false;
+    if ((Number(cp.restoredAt) || 0) > (Number(lp.restoredAt) || 0)) return false;
+    return (Number(cp.lifetimeKm) || 0) < (Number(lp.lifetimeKm) || 0) - 1e-6;
+  }
+
   async function push(player, keepalive = false, force = false) {
     if (!enabled() || !player) return false;
     if (!force) {
@@ -332,6 +346,13 @@ const Sync = (() => {
       if (cp.name === activeName) return;
       if (deleted && tombstoneFor(deleted, cp)) return; // pilote supprimé
       const lp = data.players[cp.name];
+      if (regressionEntrante(cp, lp)) {
+        console.warn(
+          `SkyFit — copie cloud IGNORÉE pour ${cp.name} : elle n'a que ` +
+          `${Math.round(cp.lifetimeKm || 0)} km contre ${Math.round(lp.lifetimeKm || 0)} ` +
+          `ici, avec le même tampon de reset. La copie locale sera republiée.`);
+        return;
+      }
       if (!lp || (cp.updatedAt || 0) > (lp.updatedAt || 0)) {
         data.players[cp.name] = cp;
         changed = true;
@@ -353,7 +374,15 @@ const Sync = (() => {
       if (deleted && tombstoneFor(deleted, lp)) continue; // supprimé ailleurs
       const cp = cloud[lp.name] ||
         Object.values(cloud).find(c => c && c.name === lp.name);
-      if (!cp || (lp.updatedAt || 0) > (cp.updatedAt || 0)) {
+      // Sauvetage : le cloud a moins de km que nous à tampon égal. Notre copie
+      // fait autorité — on la réestampille pour qu'elle gagne partout, sinon
+      // l'appareil fautif resterait bloqué sur son profil vierge.
+      const sauvetage = regressionEntrante(cp, lp);
+      if (sauvetage) {
+        lp.updatedAt = Date.now();
+        State.save(null, true);
+      }
+      if (!cp || sauvetage || (lp.updatedAt || 0) > (cp.updatedAt || 0)) {
         await push(lp);
       }
     }
