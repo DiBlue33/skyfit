@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SkyFit — Secours</title>
+<!-- ============================================================
+     SkyFit — Page de secours (incident du 03/08/2026)
+     ------------------------------------------------------------
+     POURQUOI CETTE PAGE EXISTE
+
+     Le jour de l'incident, la seule façon de savoir ce qu'un
+     téléphone contenait encore était de l'ouvrir — donc de lancer
+     le jeu, donc de déclencher migrate() puis une synchro, donc
+     potentiellement de détruire ce qu'on venait regarder.
+
+     Cette page casse ce piège : elle ne charge NI main.js, NI
+     state.js, NI sync.js. Elle ne migre rien, ne synchronise rien,
+     n'écrit rien tant qu'on n'a pas cliqué deux fois. Elle se
+     contente de LIRE le stockage de l'appareil et la base, et de
+     les mettre côte à côte.
+
+     Elle n'est volontairement pas dans le cache du service worker :
+     c'est un outil de dépannage, pas une partie du jeu.
+     ============================================================ -->
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 18px 14px 60px;
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0b1220; color: #e6edf7;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 26px 0 8px; color: #9db8e0; }
+  .sous { color: #8fa3bf; font-size: 13px; margin: 0 0 18px; }
+  .bloc {
+    background: #131c2e; border: 1px solid #24334d; border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 12px;
+  }
+  .nom { font-weight: 700; font-size: 16px; }
+  .ligne { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+  /* « > » obligatoire : sans lui, ce sélecteur attrape aussi le <span class="km">
+     imbriqué dans la colonne de droite (il est premier enfant de son parent) et
+     l'emporte en spécificité sur .fort/.faible — les km perdaient leur couleur,
+     c'est-à-dire exactement le coup d'œil pour lequel cette page existe. */
+  .ligne > span:first-child { color: #8fa3bf; }
+  .km { font-variant-numeric: tabular-nums; }
+  .fort { color: #4ade80; font-weight: 700; }
+  .faible { color: #f87171; font-weight: 700; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer;
+    border: 0; border-radius: 9px; padding: 10px 14px; margin: 8px 6px 0 0;
+    background: #1d4ed8; color: #fff;
+  }
+  button.danger { background: #b91c1c; }
+  button.calme  { background: #24334d; }
+  button:disabled { opacity: .45; cursor: default; }
+  .note { font-size: 13px; color: #8fa3bf; margin-top: 6px; }
+  .err  { color: #f87171; }
+  .ok   { color: #4ade80; }
+  code { background: #0b1220; padding: 1px 5px; border-radius: 5px; font-size: 13px; }
+  #journal { white-space: pre-wrap; font-size: 13px; color: #9db8e0; }
+</style>
+</head>
+<body>
+
+<h1>SkyFit — page de secours</h1>
+<p class="sous">
+  Cette page <strong>ne lance pas le jeu</strong> : rien n'est remis à zéro,
+  rien n'est synchronisé, rien n'est écrit tant que vous ne cliquez pas.
+  Elle montre simplement ce que contient <em>cet appareil</em> et ce que
+  contient <em>la base en ligne</em>.
+</p>
+
+<h2>📱 Sur cet appareil</h2>
+<div id="local">Lecture…</div>
+
+<h2>☁️ Dans la base en ligne</h2>
+<div id="cloud">Lecture…</div>
+
+<h2>🗄️ Sauvegardes automatiques</h2>
+<div id="backups">Lecture…</div>
+
+<h2>📋 Journal</h2>
+<div class="bloc"><div id="journal">—</div></div>
+
+<script src="js/sync-config.js"></script>
+<script src="js/config.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const DB    = (typeof SYNC_CONFIG !== 'undefined' && SYNC_CONFIG.databaseURL) || '';
+  const CLE   = (typeof CONFIG !== 'undefined' && CONFIG.SAVE_KEY) || 'skyfit_save_v1';
+  const STAMP = (typeof CONFIG !== 'undefined' && CONFIG.RESET_STAMP) || '';
+
+  const $ = (id) => document.getElementById(id);
+  const jrn = [];
+  function dire(msg, classe) {
+    jrn.push((classe === 'err' ? '⛔ ' : classe === 'ok' ? '✅ ' : '• ') + msg);
+    $('journal').textContent = jrn.join('\n');
+  }
+
+  const km   = (v) => (Math.round((Number(v) || 0) * 10) / 10).toLocaleString('fr-FR');
+  const date = (v) => {
+    const n = Number(v) || 0;
+    if (!n) return '—';
+    return new Date(n).toLocaleString('fr-FR');
+  };
+
+  /* ---------- lecture, jamais d'écriture ---------- */
+
+  function lireLocal() {
+    try {
+      const brut = localStorage.getItem(CLE);
+      if (!brut) return {};
+      return (JSON.parse(brut) || {}).players || {};
+    } catch (e) { return {}; }
+  }
+
+  function lireFilet() {
+    try {
+      const brut = localStorage.getItem('skyfit_avant_reset');
+      if (!brut) return {};
+      const d = JSON.parse(brut) || {};
+      return d.players || d || {};
+    } catch (e) { return {}; }
+  }
+
+  async function get(chemin) {
+    const r = await fetch(DB + chemin, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  }
+
+  /* ---------- affichage ---------- */
+
+  function carte(p, source, boutons) {
+    const d = document.createElement('div');
+    d.className = 'bloc';
+    const k = Number(p.lifetimeKm) || 0;
+    d.innerHTML =
+      '<div class="nom">' + (p.name || '?') + '</div>' +
+      ligne('Km à vie', '<span class="km ' + (k > 0 ? 'fort' : 'faible') + '">' + km(k) + ' km</span>') +
+      ligne('Points', km(p.points)) +
+      ligne('Atterrissages', String(p.landings || 0)) +
+      ligne('Dernière modif.', date(p.updatedAt)) +
+      ligne('Tampon de reset', '<code>' + (p.resetStamp || '—') + '</code>') +
+      ligne('Source', source);
+    if (boutons) d.appendChild(boutons);
+    return d;
+  }
+
+  function ligne(g, dr) {
+    return '<div class="ligne"><span>' + g + '</span><span>' + dr + '</span></div>';
+  }
+
+  /* ---------- la seule écriture possible ---------- */
+
+  function boutonPublier(p, etiquette) {
+    const zone = document.createElement('div');
+    const b = document.createElement('button');
+    b.textContent = etiquette;
+    let arme = false;
+    b.onclick = async () => {
+      if (!arme) {
+        arme = true;
+        b.className = 'danger';
+        b.textContent = 'Confirmer : écraser ' + p.name + ' dans le cloud';
+        return;
+      }
+      b.disabled = true;
+      try {
+        const copie = JSON.parse(JSON.stringify(p));
+        // restoredAt qui augmente = laissez-passer, côté client comme côté
+        // règles Firebase. C'est le seul cas où les km ont le droit de bouger
+        // dans le mauvais sens — ici ils remontent, mais la copie visée peut
+        // être plus « récente », donc il faut ce laissez-passer.
+        copie.restoredAt = Date.now();
+        copie.updatedAt  = Date.now();
+        copie.resetStamp = STAMP;   // sinon le prochain démarrage la remettrait à zéro
+        const r = await fetch(DB + '/players/' + encodeURIComponent(p.name) + '.json', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(copie),
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        dire('Profil ' + p.name + ' publié : ' + km(copie.lifetimeKm) + ' km.', 'ok');
+        b.className = 'calme';
+        b.textContent = 'Publié ✓';
+      } catch (e) {
+        dire('Échec de la publication de ' + p.name + ' — ' + e.message, 'err');
+        b.disabled = false;
+        b.className = '';
+        b.textContent = etiquette;
+      }
+    };
+    zone.appendChild(b);
+    const n = document.createElement('div');
+    n.className = 'note';
+    n.textContent = 'Deux clics : le premier arme, le second écrit.';
+    zone.appendChild(n);
+    return zone;
+  }
+
+  /* ---------- déroulé ---------- */
+
+  async function demarrer() {
+    if (!DB) {
+      $('local').innerHTML = '<div class="bloc err">Base non configurée sur cette copie du site.</div>';
+      return;
+    }
+    dire('Base : ' + DB.replace(/^https:\/\//, ''));
+
+    // 1. l'appareil
+    const loc = lireLocal();
+    const filet = lireFilet();
+    const zl = $('local');
+    zl.innerHTML = '';
+    const noms = Object.keys(loc);
+    if (!noms.length) {
+      zl.innerHTML = '<div class="bloc">Aucun profil enregistré sur cet appareil.</div>';
+    } else {
+      noms.forEach(n => zl.appendChild(
+        carte(loc[n], 'stockage de cet appareil', boutonPublier(loc[n], 'Publier « ' + n +' » dans le cloud'))));
+    }
+    Object.keys(filet).forEach(n => {
+      if (!filet[n] || typeof filet[n] !== 'object') return;
+      zl.appendChild(carte(filet[n], 'photo prise juste avant un grand reset',
+        boutonPublier(filet[n], 'Publier cette photo de « ' + n + ' »')));
+    });
+
+    // 2. le cloud
+    try {
+      const cl = await get('/players.json') || {};
+      const zc = $('cloud');
+      zc.innerHTML = '';
+      const cn = Object.keys(cl);
+      if (!cn.length) zc.innerHTML = '<div class="bloc">La base ne contient aucun profil.</div>';
+      else cn.forEach(n => zc.appendChild(carte(cl[n], 'base en ligne', null)));
+      dire('Base lue : ' + cn.length + ' profil(s).');
+    } catch (e) {
+      $('cloud').innerHTML = '<div class="bloc err">Lecture impossible — ' + e.message + '</div>';
+      dire('Lecture des profils impossible — ' + e.message, 'err');
+    }
+
+    // 3. les sauvegardes
+    try {
+      const bk = await get('/backups.json') || {};
+      const zb = $('backups');
+      zb.innerHTML = '';
+      const bn = Object.keys(bk);
+      if (!bn.length) {
+        zb.innerHTML = '<div class="bloc">Aucune sauvegarde en ligne pour l\'instant. ' +
+          'Elles apparaîtront dès qu\'un appareil aura ouvert le jeu en version 3.9 ou plus, ' +
+          'avec les règles Firebase à jour.</div>';
+      }
+      bn.forEach(nom => {
+        const photos = bk[nom] || {};
+        Object.keys(photos).sort((a, b) => Number(b) - Number(a)).forEach(ts => {
+          const ph = photos[ts] || {};
+          if (!ph.player) return;
+          zb.appendChild(carte(ph.player,
+            'sauvegarde du ' + date(ph.at || ts) + ' (' + (ph.tag || '?') + ')',
+            boutonPublier(ph.player, 'Restaurer « ' + nom + ' » depuis cette sauvegarde')));
+        });
+      });
+      dire('Sauvegardes lues : ' + bn.length + ' pilote(s).');
+    } catch (e) {
+      $('backups').innerHTML = '<div class="bloc err">Lecture impossible — ' + e.message +
+        '. Si c\'est un 401, les règles Firebase n\'ont pas encore été republiées.</div>';
+      dire('Lecture des sauvegardes impossible — ' + e.message, 'err');
+    }
+  }
+
+  demarrer();
+})();
+</script>
+</body>
+</html>
