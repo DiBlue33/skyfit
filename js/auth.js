@@ -43,8 +43,13 @@ const Auth = (() => {
     showView('hv-menu');
     $('home-screen').classList.add('open');
     Sync.updateBadge();
-    // Récupère les profils des autres appareils
-    Sync.fullSync().then(() => refreshHome());
+    // Récupère les profils des autres appareils. On passe par synchroAccueil()
+    // et non fullSync() : au démarrage, Main.init() attend déjà la première
+    // synchro, et deux synchros complètes lancées en parallèle se marcheraient
+    // dessus (l'une publiant ce que l'autre est en train de remplacer). Après
+    // une déconnexion, en revanche, synchroAccueil() relance bien une vraie
+    // synchro — la première étant déjà passée.
+    Sync.synchroAccueil().then(() => refreshHome());
   }
 
   /** Rafraîchit l'accueil (appelé aussi par la synchro). */
@@ -230,9 +235,19 @@ const Auth = (() => {
     card.classList.add('shake');
   }
 
+  /**
+   * Entrée en partie. On attend d'abord que la première synchro ait répondu :
+   * c'est le seul moment où un grand reset en attente peut encore être annulé
+   * par une copie à jour venue du cloud (incident du 03/08/2026). L'attente
+   * est plafonnée à 6 s côté Sync, et vaut zéro dès la deuxième connexion de
+   * la session — la promesse est mémorisée.
+   */
   function enterGame(name) {
-    hideHome();
-    Main.startWithPlayer(name);
+    Sync.premiereSynchro().then(() => {
+      State.libererReset();
+      hideHome();
+      Main.startWithPlayer(name);
+    });
   }
 
   /** Déconnexion : on retourne à l'accueil. */
@@ -253,8 +268,11 @@ const Auth = (() => {
   function bind() {
     $('btn-home-login').addEventListener('click', () => {
       showView('hv-profiles');
-      // Profils à jour (un profil créé sur l'autre téléphone doit apparaître)
-      Sync.fullSync().then(() => refreshHome());
+      // Profils à jour (un profil créé sur l'autre téléphone doit apparaître).
+      // Même prudence que dans showHome() : tant que la première synchro du
+      // démarrage n'a pas répondu, on se raccroche à elle plutôt que d'en
+      // lancer une deuxième par-dessus.
+      Sync.synchroAccueil().then(() => refreshHome());
     });
     $('btn-home-map').addEventListener('click', () => WorldMap.open());
 

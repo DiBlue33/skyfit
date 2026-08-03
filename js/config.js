@@ -559,6 +559,28 @@ CONFIG.needsReset = function (player) {
   return i < hist.length - 1;            // absent (-1) ou plus ancien
 };
 
+/**
+ * Rang du tampon de reset d'un profil dans l'histoire du jeu.
+ *   -1       : aucun tampon (profil antérieur au premier grand reset) ;
+ *   0..n-1   : position dans RESET_HISTORY ;
+ *   Infinity : tampon inconnu, donc venu d'une version PLUS RÉCENTE que
+ *              celle qui tourne ici — il fait autorité, on ne le contredit pas.
+ *
+ * Sert à départager deux copies d'un même pilote : **un rang plus élevé gagne
+ * toujours, quelle que soit la date**. C'est ce qui fait qu'un grand reset se
+ * propage proprement. Sans cette règle, la copie d'AVANT le reset — plus
+ * « récente » au sens des dates, puisque resetPlayer ne réestampille plus —
+ * revenait du cloud annuler le reset, qui repartait au démarrage suivant, et
+ * ainsi de suite.
+ */
+CONFIG.rangStamp = function (player) {
+  const hist = CONFIG.RESET_HISTORY || [];
+  const stamp = player && player.resetStamp;
+  if (!stamp) return -1;
+  const i = hist.indexOf(stamp);
+  return i === -1 ? Infinity : i;
+};
+
 CONFIG.planeOf = function (player) {
   return CONFIG.planeById(player && player.currentPlane);
 };

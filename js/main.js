@@ -8,6 +8,14 @@ const Main = (() => {
   let worldInterval = null;
 
   function init() {
+    // ⚠️ Incident du 03/08/2026 — l'ordre de ces deux lignes est le cœur du
+    // correctif. State.load() décidait d'un grand reset sur les données du
+    // navigateur avant d'avoir vu la moindre donnée du cloud : un appareil
+    // resté fermé rejouait un reset déjà appliqué ailleurs, sur une copie
+    // périmée, et publiait le résultat par-dessus les bonnes données. On
+    // suspend donc la décision jusqu'à la première synchro (Auth la libère
+    // avant d'entrer en partie, et de toute façon au bout de 6 secondes).
+    State.suspendreReset(true);
     State.load();
     Weather.init();     // 🌬️ vents réels : cache local puis rafraîchissement en fond
     Scene.init();
@@ -18,6 +26,13 @@ const Main = (() => {
 
     // Toujours passer par l'écran d'accueil (connexion par code PIN)
     Auth.showHome();
+
+    // Filet : même si l'utilisateur reste à l'accueil sans se connecter, la
+    // décision de reset finit par être tranchée — une fois le cloud consulté.
+    Sync.premiereSynchro().then(() => {
+      const n = State.libererReset();
+      if (n) Auth.refreshHome();
+    });
   }
 
   /** Vrai si une partie est en cours (l'accueil est refermé). */

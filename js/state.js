@@ -192,6 +192,49 @@ const State = (() => {
 
   let data = null; // { players: {name -> player}, currentPlayer: name|null }
 
+  /* ---------- Le grand reset attend d'avoir vu le cloud ----------
+     C'est LA leçon du 03/08/2026. Jusqu'ici, migrate() décidait d'un grand
+     reset au tout premier instant du démarrage, sur les seules données du
+     navigateur — donc éventuellement sur une copie vieille de plusieurs
+     heures, alors que le cloud contenait déjà la version à jour et déjà
+     remise à zéro. L'appareil en retard rejouait un reset qui avait DÉJÀ eu
+     lieu ailleurs, sur des données périmées.
+
+     Désormais Main.init() suspend le reset le temps de la première synchro.
+     Quand le cloud a répondu, les profils locaux ont été remplacés par les
+     copies à jour (qui portent déjà le bon tampon) : dans le cas du 03/08,
+     il n'y a alors PLUS RIEN à remettre à zéro. Le reset ne se déclenche
+     qu'une seule fois, sur le premier appareil qui le découvre, puis se
+     propage comme une donnée — plus comme une décision reprise à zéro par
+     chaque appareil.
+
+     Si le réseau ne répond pas, libererReset() est appelé quand même après
+     un court délai : hors ligne, on retombe sur l'ancien comportement, mais
+     les garde-fous de sync.js empêchent le résultat de contaminer les autres.
+     ------------------------------------------------------------ */
+  let resetSuspendu = false;
+  let resetsEnAttente = false;
+
+  function suspendreReset(v) { resetSuspendu = v !== false; }
+
+  /** Applique les grands resets mis en attente. Renvoie le nombre de profils
+      réellement remis à zéro (0 la plupart du temps — c'est le but). */
+  function libererReset() {
+    resetSuspendu = false;
+    if (!resetsEnAttente) return 0;
+    resetsEnAttente = false;
+    let n = 0;
+    Object.values(data ? data.players : {}).forEach(p => {
+      if (!CONFIG.needsReset(p)) return;
+      sauvegardeAvantReset(p);
+      resetPlayer(p);
+      n++;
+      console.info('SkyFit — grand reset appliqué à', p.name, CONFIG.RESET_STAMP);
+    });
+    if (n) { migrate(); save(null, true); }
+    return n;
+  }
+
   function load() {
     try {
       const raw = localStorage.getItem(CONFIG.SAVE_KEY);
@@ -224,9 +267,15 @@ const State = (() => {
       // pas (voir CONFIG.needsReset). Sans cette règle, deux téléphones
       // décalés d'une version se remettaient mutuellement à zéro sans fin.
       if (CONFIG.needsReset(p)) {
-        sauvegardeAvantReset(p);
-        resetPlayer(p);
-        console.info('SkyFit — grand reset appliqué à', p.name, CONFIG.RESET_STAMP);
+        if (resetSuspendu) {
+          // On ne touche à rien : la première synchro va peut-être rapporter
+          // une copie déjà à jour, auquel cas il n'y aura rien à effacer.
+          resetsEnAttente = true;
+        } else {
+          sauvegardeAvantReset(p);
+          resetPlayer(p);
+          console.info('SkyFit — grand reset appliqué à', p.name, CONFIG.RESET_STAMP);
+        }
       }
       // Listes potentiellement perdues/déformées par Firebase
       if (!Array.isArray(p.activityLog)) {
@@ -490,5 +539,8 @@ const State = (() => {
     load, save, raw, migrate, resetPlayer, addPlayer, selectPlayer, current, allPlayers,
     playerNames, availablePoints, tankCapacity, keroYield, decayFactor, airspeed, ceiling,
     sauvegardes, restaurer, sauvegardesEnAttente, marquerSauvegardeEnvoyee,
+    // Grand reset différé : voir le commentaire au-dessus de suspendreReset.
+    suspendreReset, libererReset,
+    resetEnAttente: () => resetsEnAttente,
   };
 })();

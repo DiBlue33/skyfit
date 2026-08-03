@@ -93,6 +93,38 @@ const Sync = (() => {
     return (Number(cp.lifetimeKm) || 0) < (Number(lp.lifetimeKm) || 0) - 1e-6;
   }
 
+  /**
+   * L'arbitre unique entre deux copies d'un même pilote : « est-ce que A doit
+   * remplacer B ? ». Quatre critères, dans cet ordre, et le premier qui
+   * départage tranche.
+   *
+   *   1. Le RANG DU TAMPON de reset. Un rang supérieur veut dire « cette copie
+   *      a vu une étape de l'histoire du jeu que l'autre ignore » : elle gagne
+   *      même si elle est plus ancienne. C'est ce qui fait qu'un grand reset se
+   *      propage au lieu d'être annulé en boucle par la copie d'avant.
+   *   2. La RESTAURATION explicite (restoredAt qui augmente). C'est le seul
+   *      geste humain de la liste : il passe avant le compteur de kilomètres,
+   *      sans quoi on ne pourrait jamais revenir volontairement en arrière.
+   *   3. Les KILOMÈTRES À VIE. À tampon égal ils ne font que monter — une
+   *      copie qui en a moins est forcément abîmée, quelle que soit sa date.
+   *      Sans ce critère, un appareil qui s'est remis à zéro hors ligne avec
+   *      une horloge en avance restait bloqué sur son profil vierge : il
+   *      refusait de publier (garde-fou sortant) ET refusait d'adopter le
+   *      cloud (plus « ancien »). Cul-de-sac.
+   *   4. La DATE, en dernier recours seulement.
+   */
+  function copieGagne(a, b) {
+    if (!b) return true;
+    if (!a) return false;
+    const ra = CONFIG.rangStamp(a), rb = CONFIG.rangStamp(b);
+    if (ra !== rb) return ra > rb;
+    const sa = Number(a.restoredAt) || 0, sb = Number(b.restoredAt) || 0;
+    if (sa !== sb) return sa > sb;
+    const ka = Number(a.lifetimeKm) || 0, kb = Number(b.lifetimeKm) || 0;
+    if (Math.abs(ka - kb) > 1e-6) return ka > kb;
+    return (a.updatedAt || 0) > (b.updatedAt || 0);
+  }
+
   async function push(player, keepalive = false, force = false) {
     if (!enabled() || !player) return false;
     if (!force) {
@@ -353,7 +385,7 @@ const Sync = (() => {
           `ici, avec le même tampon de reset. La copie locale sera republiée.`);
         return;
       }
-      if (!lp || (cp.updatedAt || 0) > (lp.updatedAt || 0)) {
+      if (copieGagne(cp, lp)) {
         data.players[cp.name] = cp;
         changed = true;
       }
@@ -382,9 +414,8 @@ const Sync = (() => {
         lp.updatedAt = Date.now();
         State.save(null, true);
       }
-      if (!cp || sauvetage || (lp.updatedAt || 0) > (cp.updatedAt || 0)) {
-        await push(lp);
-      }
+      // Exactement le même arbitre, dans l'autre sens.
+      if (sauvetage || copieGagne(lp, cp)) await push(lp);
     }
   }
 
@@ -401,6 +432,36 @@ const Sync = (() => {
     await envoyerSauvegardes();   // photos prises avant un grand reset
     await sauvegardeQuotidienne();
     return changed;
+  }
+
+  /* ---------- La première synchro, celle qui compte ----------
+     Tant qu'elle n'a pas répondu, on ne sait pas si les données de cet
+     appareil sont à jour — donc on ne prend aucune décision destructrice
+     (voir State.suspendreReset). Ce verrou n'est JAMAIS éternel : au bout de
+     DELAI_PREMIERE_SYNCHRO le jeu repart quoi qu'il arrive, sinon un
+     téléphone sans réseau resterait bloqué à l'accueil.
+     ------------------------------------------------------------ */
+  const DELAI_PREMIERE_SYNCHRO = 6000;
+  let promessePremiere = null;
+
+  function premiereSynchro() {
+    if (promessePremiere) return promessePremiere;
+    if (!enabled()) { promessePremiere = Promise.resolve(false); return promessePremiere; }
+    promessePremiere = Promise.race([
+      fullSync().then(() => true).catch(() => false),
+      new Promise(r => setTimeout(() => r(false), DELAI_PREMIERE_SYNCHRO)),
+    ]);
+    return promessePremiere;
+  }
+
+  /**
+   * Synchro d'affichage de l'accueil. La toute première fois, c'est LA
+   * première synchro — mutualisée avec celle que Main.init() attend déjà, pour
+   * ne pas en lancer deux en parallèle. Ensuite (retour à l'accueil après une
+   * déconnexion, clic sur « Connexion »), c'est une synchro ordinaire.
+   */
+  function synchroAccueil() {
+    return promessePremiere ? fullSync() : premiereSynchro();
   }
 
   function isPlaying() {
@@ -489,7 +550,8 @@ const Sync = (() => {
   }
 
   return {
-    enabled, pullAll, push, mergeIntoLocal, fullSync, deletePlayer,
+    enabled, pullAll, push, mergeIntoLocal, fullSync, premiereSynchro, synchroAccueil,
+    deletePlayer,
     savePush, deletePush,
     startLoop, statusText, updateBadge,
     // Sauvegardes de secours + garde-fou (v3.9)
